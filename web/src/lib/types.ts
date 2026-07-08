@@ -16,6 +16,8 @@ export interface Profile {
   weight_kg: number | null;
   body_type: string | null;
   rating: number;
+  status: string;
+  rank: number | null;
   notes: string | null;
   extra: Record<string, string>;
   created_at: number;
@@ -30,6 +32,7 @@ export interface AppConfig {
   stat_presets: string[];
   rating_half_steps: boolean;
   gold_standard_id: string | null;
+  statuses: string[];
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -38,6 +41,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
   rating_half_steps: true,
   gold_standard_id: null,
+  statuses: ['active', 'inactive'],
 };
 
 export interface ProfileCard extends Profile {
