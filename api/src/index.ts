@@ -9,6 +9,7 @@ type Bindings = {
   PHOTOS: R2Bucket;
   ALLOWED_ORIGIN: string;
   SESSION_SECRET: string;
+  JARVIS_INGEST_TOKEN: string;
 };
 
 type SessionUser = {
@@ -27,8 +28,10 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 // ---------------- CORS ----------------
 app.use('*', cors({
   origin: (origin, c) => {
-    const allowed = [c.env.ALLOWED_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'];
-    return allowed.includes(origin) ? origin : allowed[0];
+    if (origin === c.env.ALLOWED_ORIGIN) return origin;
+    // any localhost port during local dev
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '')) return origin;
+    return c.env.ALLOWED_ORIGIN;
   },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
@@ -71,6 +74,16 @@ const requireAdmin = async (c: any, next: any) => {
   await next();
 };
 
+// Bearer-token auth for the Jarvis server's feedback poller (not a browser session).
+const jarvisAuth = async (c: any, next: any) => {
+  const hdr = c.req.header('Authorization') || '';
+  const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : '';
+  if (!c.env.JARVIS_INGEST_TOKEN || token !== c.env.JARVIS_INGEST_TOKEN) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  await next();
+};
+
 function serializeProfile(row: any) {
   let extra: any = {};
   if (row.extra) { try { extra = JSON.parse(row.extra); } catch { extra = {}; } }
@@ -80,6 +93,7 @@ function serializeProfile(row: any) {
     birthday: row.birthday,
     sign: row.sign,
     height_cm: row.height_cm,
+    weight_kg: row.weight_kg ?? null,
     body_type: row.body_type,
     rating: row.rating,
     notes: row.notes,
@@ -87,6 +101,34 @@ function serializeProfile(row: any) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+// App configuration (admin-editable). Defaults fill any keys missing from the
+// stored row so older configs stay forward-compatible.
+const DEFAULT_CONFIG = {
+  units: 'us' as 'us' | 'metric',
+  body_types: ['Slim', 'Athletic', 'Average', 'Curvy', 'Muscular', 'Plus-size', 'Petite', 'Tall'],
+  stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
+  rating_half_steps: true,
+  gold_standard_id: null as string | null,
+};
+
+async function getConfig(c: any) {
+  const row = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'config'").first();
+  let stored: any = {};
+  if (row?.value) { try { stored = JSON.parse(row.value); } catch { stored = {}; } }
+  return { ...DEFAULT_CONFIG, ...stored };
+}
+
+function cleanList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of v) {
+    const s = String(item).trim();
+    if (s && !seen.has(s.toLowerCase())) { seen.add(s.toLowerCase()); out.push(s); }
+  }
+  return out;
 }
 
 // ---------------- health ----------------
@@ -130,17 +172,37 @@ app.post('/auth/logout', auth, async (c) => {
 
 app.get('/auth/me', auth, (c) => c.json({ user: c.get('user') }));
 
+// ---------------- settings (config) ----------------
+app.get('/settings', auth, async (c) => c.json({ config: await getConfig(c) }));
+
+app.put('/admin/settings', auth, requireAdmin, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const next = await getConfig(c);
+  if (b.units === 'us' || b.units === 'metric') next.units = b.units;
+  if (b.body_types !== undefined) next.body_types = cleanList(b.body_types);
+  if (b.stat_presets !== undefined) next.stat_presets = cleanList(b.stat_presets);
+  if (typeof b.rating_half_steps === 'boolean') next.rating_half_steps = b.rating_half_steps;
+  if (b.gold_standard_id !== undefined) next.gold_standard_id = b.gold_standard_id ? String(b.gold_standard_id) : null;
+  await c.env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).bind(JSON.stringify(next)).run();
+  return c.json({ config: next });
+});
+
 // ---------------- profiles ----------------
 app.get('/profiles', auth, async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.*,
-            (SELECT r2_key FROM profile_photos pp WHERE pp.profile_id = p.id
-             ORDER BY sort_order, created_at LIMIT 1) AS primary_key
+            (SELECT r2_key  FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_key,
+            (SELECT focal_x FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_focal_x,
+            (SELECT focal_y FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_focal_y
      FROM profiles p ORDER BY p.updated_at DESC`,
   ).all();
   const cards = (results as any[]).map((r) => ({
     ...serializeProfile(r),
     photo_key: r.primary_key ?? null,
+    photo_focal_x: r.primary_focal_x ?? 50,
+    photo_focal_y: r.primary_focal_y ?? 50,
   }));
   return c.json({ profiles: cards });
 });
@@ -152,11 +214,11 @@ app.post('/profiles', auth, requireEditor, async (c) => {
   const ts = now();
   const birthday = b.birthday || null;
   await c.env.DB.prepare(
-    `INSERT INTO profiles (id, name, birthday, sign, height_cm, body_type, rating, notes, extra, created_by, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, created_by, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id, String(b.name).trim(), birthday, zodiac(birthday),
-    b.height_cm ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
+    b.height_cm ?? null, b.weight_kg ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
     b.notes ?? null, b.extra ? JSON.stringify(b.extra) : null,
     c.get('user').id, ts, ts,
   ).run();
@@ -169,7 +231,7 @@ app.get('/profiles/:id', auth, async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   if (!row) return c.json({ error: 'not found' }, 404);
   const photos = await c.env.DB.prepare(
-    'SELECT id, r2_key, content_type, sort_order, created_at FROM profile_photos WHERE profile_id = ? ORDER BY sort_order, created_at',
+    'SELECT id, r2_key, content_type, sort_order, focal_x, focal_y, created_at FROM profile_photos WHERE profile_id = ? ORDER BY sort_order, created_at',
   ).bind(id).all();
   const dates = await c.env.DB.prepare(
     'SELECT * FROM date_logs WHERE profile_id = ? ORDER BY occurred_on DESC, created_at DESC',
@@ -191,15 +253,16 @@ app.patch('/profiles/:id', auth, requireEditor, async (c) => {
   const birthday = b.birthday !== undefined ? (b.birthday || null) : existing.birthday;
   const sign = b.birthday !== undefined ? zodiac(birthday as string) : existing.sign;
   const height_cm = b.height_cm !== undefined ? b.height_cm : existing.height_cm;
+  const weight_kg = b.weight_kg !== undefined ? b.weight_kg : existing.weight_kg;
   const body_type = b.body_type !== undefined ? b.body_type : existing.body_type;
   const rating = b.rating !== undefined ? clampRating(b.rating) : existing.rating;
   const notes = b.notes !== undefined ? b.notes : existing.notes;
   const extra = b.extra !== undefined ? (b.extra ? JSON.stringify(b.extra) : null) : existing.extra;
 
   await c.env.DB.prepare(
-    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
+    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
      WHERE id=?`,
-  ).bind(name, birthday, sign, height_cm, body_type, rating, notes, extra, now(), id).run();
+  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, now(), id).run();
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   return c.json({ profile: serializeProfile(row) });
 });
@@ -253,6 +316,74 @@ app.post('/profiles/:id/photos', auth, requireEditor, async (c) => {
   ).bind(id, profileId, key, file.type || null, order, ts).run();
   await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
   return c.json({ photo: { id, r2_key: key, content_type: file.type, sort_order: order, created_at: ts } }, 201);
+});
+
+// Scrape an image from a URL, store it in R2 (same as a direct upload).
+app.post('/profiles/:id/photos/url', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const exists = await c.env.DB.prepare('SELECT id FROM profiles WHERE id = ?').bind(profileId).first();
+  if (!exists) return c.json({ error: 'not found' }, 404);
+
+  const b = await c.req.json().catch(() => ({} as any));
+  const url = String(b.url ?? '').trim();
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return c.json({ error: 'invalid URL' }, 400); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return c.json({ error: 'URL must start with http:// or https://' }, 400);
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, { headers: { 'User-Agent': 'BrookeslistBot/1.0', Accept: 'image/*' }, redirect: 'follow' });
+  } catch {
+    return c.json({ error: 'could not reach that URL' }, 502);
+  }
+  if (!resp.ok) return c.json({ error: `fetch failed (HTTP ${resp.status})` }, 502);
+  const ct = (resp.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!ct.startsWith('image/')) return c.json({ error: 'that URL is not an image' }, 415);
+  const buf = await resp.arrayBuffer();
+  if (buf.byteLength === 0) return c.json({ error: 'the image was empty' }, 400);
+  if (buf.byteLength > MAX_PHOTO_BYTES) return c.json({ error: 'image too large (max 10MB)' }, 413);
+
+  const ext = (ct.split('/')[1] || 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';
+  const key = `${profileId}/${uuid()}.${ext}`;
+  await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: ct } });
+
+  const id = uuid();
+  const ts = now();
+  await c.env.DB.prepare(
+    'INSERT INTO profile_photos (id, profile_id, r2_key, content_type, sort_order, created_at) VALUES (?,?,?,?,?,?)',
+  ).bind(id, profileId, key, ct, ts, ts).run();
+  await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
+  return c.json({ photo: { id, r2_key: key, content_type: ct, sort_order: ts, created_at: ts } }, 201);
+});
+
+// Reorder a profile's photos. `order` is the full list of photo ids; index 0
+// becomes sort_order 0 = the primary photo shown on the catalog card.
+app.post('/profiles/:id/photos/order', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const b = await c.req.json().catch(() => ({} as any));
+  const order = Array.isArray(b.order) ? b.order.filter((x: any) => typeof x === 'string') : [];
+  if (!order.length) return c.json({ error: 'order required' }, 400);
+  await c.env.DB.batch(
+    order.map((pid: string, i: number) =>
+      c.env.DB.prepare('UPDATE profile_photos SET sort_order = ? WHERE id = ? AND profile_id = ?').bind(i, pid, profileId)),
+  );
+  await c.env.DB.prepare('UPDATE profiles SET updated_at = ? WHERE id = ?').bind(now(), profileId).run();
+  return c.json({ ok: true });
+});
+
+// Update a photo's focal point (0–100 each axis) for repositioning in its frame.
+app.patch('/photos/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const b = await c.req.json().catch(() => ({} as any));
+  const clamp = (v: any) => Math.max(0, Math.min(100, Number(v)));
+  const fx = clamp(b.focal_x);
+  const fy = clamp(b.focal_y);
+  if (!isFinite(fx) || !isFinite(fy)) return c.json({ error: 'focal_x and focal_y required' }, 400);
+  const res = await c.env.DB.prepare('UPDATE profile_photos SET focal_x = ?, focal_y = ? WHERE id = ?').bind(fx, fy, id).run();
+  if (!res.meta.changes) return c.json({ error: 'not found' }, 404);
+  return c.json({ ok: true, focal_x: fx, focal_y: fy });
 });
 
 app.delete('/photos/:id', auth, requireEditor, async (c) => {
@@ -373,6 +504,46 @@ app.delete('/admin/users/:id', auth, requireAdmin, async (c) => {
     c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id),
   ]);
   return c.json({ ok: true });
+});
+
+// ---------------- feedback / support ----------------
+app.post('/feedback', auth, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const message = String(b.message ?? '').trim();
+  if (!message) return c.json({ error: 'a message is required' }, 400);
+  const user = c.get('user');
+  const id = uuid();
+  await c.env.DB.prepare(
+    `INSERT INTO feedback (id, user_email, user_id, category, subject, message, page_url, status, created_at)
+     VALUES (?,?,?,?,?,?,?, 'new', ?)`,
+  ).bind(
+    id, user.email, user.id,
+    b.category ? String(b.category).slice(0, 40) : null,
+    b.subject ? String(b.subject).slice(0, 200) : null,
+    message.slice(0, 5000),
+    b.page_url ? String(b.page_url).slice(0, 500) : null,
+    now(),
+  ).run();
+  return c.json({ ok: true }, 201);
+});
+
+// Jarvis pulls new feedback, emails Dan, then acks. Bearer-token protected.
+app.get('/feedback/pending', jarvisAuth, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, user_email, category, subject, message, page_url, created_at FROM feedback WHERE status = 'new' ORDER BY created_at LIMIT 50",
+  ).all();
+  return c.json({ feedback: results });
+});
+
+app.post('/feedback/ack', jarvisAuth, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const ids = Array.isArray(b.ids) ? b.ids.filter((x: any) => typeof x === 'string') : [];
+  if (!ids.length) return c.json({ ok: true, acked: 0 });
+  const ts = now();
+  await c.env.DB.batch(
+    ids.map((id: string) => c.env.DB.prepare("UPDATE feedback SET status = 'sent', sent_at = ? WHERE id = ? AND status = 'new'").bind(ts, id)),
+  );
+  return c.json({ ok: true, acked: ids.length });
 });
 
 export default app;

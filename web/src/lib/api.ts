@@ -1,4 +1,4 @@
-import type { DateLog, Photo, Profile, ProfileCard, ProfileDetail, User } from './types';
+import type { AppConfig, DateLog, Photo, Profile, ProfileCard, ProfileDetail, User } from './types';
 
 export const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8787';
 
@@ -43,6 +43,9 @@ export const api = {
     req<{ user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }).then((r) => r.user),
   logout: () => req<{ ok: true }>('/auth/logout', { method: 'POST' }),
 
+  sendFeedback: (data: { category?: string; subject?: string; message: string; page_url?: string }) =>
+    req<{ ok: true }>('/feedback', { method: 'POST', body: JSON.stringify(data) }),
+
   listProfiles: () => req<{ profiles: ProfileCard[] }>('/profiles').then((r) => r.profiles),
   getProfile: (id: string) => req<ProfileDetail>(`/profiles/${id}`),
   createProfile: (data: Partial<Profile>) =>
@@ -58,13 +61,23 @@ export const api = {
     fd.append('file', file);
     return req<{ photo: Photo }>(`/profiles/${profileId}/photos`, { method: 'POST', body: fd }).then((r) => r.photo);
   },
+  addPhotoUrl: (profileId: string, url: string) =>
+    req<{ photo: Photo }>(`/profiles/${profileId}/photos/url`, { method: 'POST', body: JSON.stringify({ url }) }).then((r) => r.photo),
   deletePhoto: (photoId: string) => req<{ ok: true }>(`/photos/${photoId}`, { method: 'DELETE' }),
+  updatePhotoFocal: (photoId: string, focal_x: number, focal_y: number) =>
+    req<{ ok: true }>(`/photos/${photoId}`, { method: 'PATCH', body: JSON.stringify({ focal_x, focal_y }) }),
+  reorderPhotos: (profileId: string, order: string[]) =>
+    req<{ ok: true }>(`/profiles/${profileId}/photos/order`, { method: 'POST', body: JSON.stringify({ order }) }),
 
   addDate: (profileId: string, data: Partial<DateLog>) =>
     req<{ date: DateLog }>(`/profiles/${profileId}/dates`, { method: 'POST', body: JSON.stringify(data) }).then((r) => r.date),
   updateDate: (id: string, data: Partial<DateLog>) =>
     req<{ date: DateLog }>(`/dates/${id}`, { method: 'PATCH', body: JSON.stringify(data) }).then((r) => r.date),
   deleteDate: (id: string) => req<{ ok: true }>(`/dates/${id}`, { method: 'DELETE' }),
+
+  getSettings: () => req<{ config: AppConfig }>('/settings').then((r) => r.config),
+  updateSettings: (patch: Partial<AppConfig>) =>
+    req<{ config: AppConfig }>('/admin/settings', { method: 'PUT', body: JSON.stringify(patch) }).then((r) => r.config),
 
   listUsers: () => req<{ users: User[] }>('/admin/users').then((r) => r.users),
   createUser: (data: { email: string; password: string; role: string; display_name?: string }) =>

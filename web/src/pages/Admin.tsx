@@ -47,28 +47,28 @@ export default function Admin() {
     catch (err: any) { setError(err.message); }
   }
 
-  const input = 'rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40';
+  const input = 'w-full sm:w-auto rounded-lg bg-field px-3 py-2 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40';
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-5 text-2xl font-bold">Users</h1>
-      {error && <div className="mb-4 rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</div>}
+      {error && <div className="mb-4 rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-500">{error}</div>}
 
-      <form onSubmit={create} className="mb-6 flex flex-wrap items-end gap-2 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <form onSubmit={create} className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-ink/5 p-4 ring-1 ring-ink/10 sm:flex sm:flex-wrap sm:items-end">
         <div>
-          <label className="mb-1 block text-xs text-white/40">Email</label>
+          <label className="mb-1 block text-xs text-ink/40">Email</label>
           <input type="email" required className={input} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-white/40">Password</label>
+          <label className="mb-1 block text-xs text-ink/40">Password</label>
           <input type="text" required minLength={8} placeholder="min 8 chars" className={input} value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-white/40">Name</label>
+          <label className="mb-1 block text-xs text-ink/40">Name</label>
           <input className={input} value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-white/40">Role</label>
+          <label className="mb-1 block text-xs text-ink/40">Role</label>
           <select className={input} value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
             {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
@@ -79,11 +79,11 @@ export default function Admin() {
       </form>
 
       {!users ? (
-        <div className="py-10 text-center text-white/40">Loading…</div>
+        <div className="py-10 text-center text-ink/40">Loading…</div>
       ) : (
-        <div className="overflow-hidden rounded-2xl ring-1 ring-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/40">
+        <div className="overflow-x-auto rounded-2xl ring-1 ring-ink/10">
+          <table className="w-full min-w-[520px] text-left text-sm">
+            <thead className="bg-ink/5 text-xs uppercase tracking-wide text-ink/40">
               <tr>
                 <th className="px-4 py-2">Email</th>
                 <th className="px-4 py-2">Name</th>
@@ -93,23 +93,23 @@ export default function Admin() {
             </thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id} className="border-t border-white/5">
-                  <td className="px-4 py-2">{u.email}{u.id === me?.id && <span className="ml-1 text-xs text-white/30">(you)</span>}</td>
-                  <td className="px-4 py-2 text-white/60">{u.display_name || '—'}</td>
+                <tr key={u.id} className="border-t border-ink/5">
+                  <td className="px-4 py-2">{u.email}{u.id === me?.id && <span className="ml-1 text-xs text-ink/30">(you)</span>}</td>
+                  <td className="px-4 py-2 text-ink/60">{u.display_name || '—'}</td>
                   <td className="px-4 py-2">
                     <select
                       value={u.role}
                       disabled={u.id === me?.id}
                       onChange={(e) => changeRole(u, e.target.value)}
-                      className="rounded-md bg-black/30 px-2 py-1 text-xs ring-1 ring-white/10 disabled:opacity-40"
+                      className="rounded-md bg-field px-2 py-1 text-xs ring-1 ring-ink/10 disabled:opacity-40"
                     >
                       {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </td>
                   <td className="px-4 py-2 text-right">
-                    <button onClick={() => resetPassword(u)} className="mr-3 text-xs text-white/40 hover:text-white">reset pw</button>
+                    <button onClick={() => resetPassword(u)} className="mr-3 text-xs text-ink/40 hover:text-ink">reset pw</button>
                     {u.id !== me?.id && (
-                      <button onClick={() => remove(u)} className="text-xs text-white/40 hover:text-rose-300">delete</button>
+                      <button onClick={() => remove(u)} className="text-xs text-ink/40 hover:text-rose-300">delete</button>
                     )}
                   </td>
                 </tr>

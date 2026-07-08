@@ -115,9 +115,70 @@ allows `localhost:5173` via CORS and omits the `Secure` cookie flag on localhost
 - **New schema change:** add `api/migrations/000N_*.sql`, then `npm run migrate:prod` / `:dev`.
 - **Promotion:** work on `dev`, verify at `/dev/`, promote to `main` via a PR you approve.
 
+## Photos
+
+Each profile has a photo gallery (upload a file **or** paste an image URL, which the
+Worker scrapes into R2). Editors can:
+- **Reposition** — drag a photo to set its focal point; stored per-photo as
+  `focal_x`/`focal_y` (object-position %) and applied on the card + detail + thumbnails.
+- **Remove background** — client-side via `@imgly/background-removal` (lazy-loaded; first
+  run downloads an ONNX model). The cut-out PNG is uploaded as a new photo (non-destructive).
+
+Catalog cards are horizontal: photo on the left, name/stats/rating on the right.
+
+## Support / feedback → Jarvis → email
+
+The **Support** page (in the header, all users) posts to `POST /feedback`, which stores
+the submission in D1. Because the Cloudflare Worker can't reach the Tailscale-only Jarvis
+box, Jarvis **pulls**: a tiny cron poller on the server reads new items and emails them to
+Dan from Jarvis's own Gmail, then acks them.
+
+- `GET /feedback/pending` and `POST /feedback/ack` are protected by a bearer token
+  (`JARVIS_INGEST_TOKEN` Worker secret) — not a browser session.
+- Bridge script: `deploy/jarvis-feedback-poller.py` (pure stdlib, no deps).
+
+**Live install** (already set up on `dan@100.102.159.57`):
+- Script: `/home/dan/brookeslist-feedback/jarvis-feedback-poller.py`
+- Env (chmod 600): `/home/dan/brookeslist-feedback/feedback-poller.env` — SMTP creds are
+  read from Jarvis's own `config.yaml` (`serveremail.jarvis@gmail.com`); `BROOKESLIST_API`
+  points at the **dev** API; `NOTIFY_TO=myemailisdanmail@gmail.com`.
+- Cron (every 5 min): `crontab -l | grep feedback`; log at `~/brookeslist-feedback/poller.log`.
+
+Notes:
+- The poller sends a real `User-Agent` — Cloudflare's edge 403s the default `Python-urllib/*`.
+- **On prod promotion:** set a prod `JARVIS_INGEST_TOKEN` Worker secret, then update the env
+  file's `JARVIS_INGEST_TOKEN` + `BROOKESLIST_API=https://brookeslist-api.dabrewer.dev`.
+- To reinstall from scratch, `deploy/feedback-poller.env.example` documents every key.
+
 ## Roles
 | | viewer | editor | admin |
 |---|:--:|:--:|:--:|
 | View profiles/photos/dates | ✅ | ✅ | ✅ |
 | Create/edit/delete profiles, photos, dates, ratings | | ✅ | ✅ |
+| Submit support/feedback | ✅ | ✅ | ✅ |
 | Manage users (invite / set role / reset pw) | | | ✅ |
+| App configuration (Settings page) | | | ✅ |
+
+## Configuration (admin → Settings)
+
+App-wide config lives in a D1 `settings` table (single `config` JSON row) and is
+edited from the in-app **Settings** page (admins only). `GET /settings` is readable
+by any signed-in user; `PUT /admin/settings` is admin-only. Current options:
+
+- **Units** — `us` (feet/inches, pounds — **default**) or `metric` (cm, kg). Drives
+  how height/weight are entered and displayed everywhere. Values are stored in metric
+  base columns (`height_cm`, `weight_kg`) and converted per-unit in the UI.
+- **Body types** — the list offered in the profile editor's body-type field.
+- **Custom stat labels** — suggested labels for a profile's free-form "Other stats".
+- **Ratings** — toggle half-star ratings (e.g. 3.5) on/off.
+- **Gold standard** — feature one profile as the perfect candidate: its card glows gold
+  with a star badge, and the detail page gets a "Gold standard" ribbon. Stored as
+  `gold_standard_id` (a profile id or null).
+
+**Theme** — a light/dark toggle (in the header, all users) persists per-browser in
+`localStorage`. Light mode is white + pink; dark is the default. Theming works via a
+single `ink` CSS-variable color token that flips between near-white and near-black, so
+every `ink/opacity` surface inverts correctly (see `web/src/index.css`, `theme/ThemeContext.tsx`).
+
+Missing keys fall back to defaults in the Worker (`DEFAULT_CONFIG`), so the config is
+forward-compatible as new options are added.

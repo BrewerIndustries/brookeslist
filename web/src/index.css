@@ -1,20 +1,54 @@
 @import "tailwindcss";
 
+/* Semantic color tokens exposed to Tailwind. `ink` is the single foreground/surface
+   token: near-white in dark mode, near-black in light mode — so every `ink/opacity`
+   utility inverts correctly between themes. */
+@theme inline {
+  --color-ink: var(--ink);
+  --color-field: var(--field);
+  --color-brand-rose: var(--brand-rose);
+  --color-brand-violet: var(--brand-violet);
+}
+
+/* Dark theme (default) */
 :root {
   color-scheme: dark;
+  --ink: #ece8f2;
+  --field: rgba(0, 0, 0, 0.30);
+  --brand-rose: #fecdd3;   /* rose-200 */
+  --brand-violet: #c4b5fd; /* violet-300 */
+  --page-bg: #0e0b14;
+  --glow-1: rgba(190, 80, 120, 0.18);
+  --glow-2: rgba(120, 90, 200, 0.14);
+}
+
+/* Light theme — white + pink, brand stays pink (a touch deeper so it reads on white) */
+.theme-light {
+  color-scheme: light;
+  --ink: #3b2a3f;
+  --field: #ffffff;
+  --brand-rose: #fb7185;   /* rose-400 */
+  --brand-violet: #8b5cf6; /* violet-500 */
+  --page-bg: #fff5f8;
+  --glow-1: rgba(244, 114, 182, 0.22);
+  --glow-2: rgba(167, 139, 250, 0.13);
 }
 
 body {
   margin: 0;
-  background: #0e0b14;
-  color: #ece8f2;
+  background: var(--page-bg);
+  color: var(--ink);
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* subtle warm gradient backdrop */
 #root {
   min-height: 100vh;
   background:
-    radial-gradient(1200px 600px at 80% -10%, rgba(190, 80, 120, 0.18), transparent 60%),
-    radial-gradient(900px 500px at -10% 10%, rgba(120, 90, 200, 0.14), transparent 55%);
+    radial-gradient(1200px 600px at 80% -10%, var(--glow-1), transparent 60%),
+    radial-gradient(900px 500px at -10% 10%, var(--glow-2), transparent 55%);
+}
+
+/* Gold-standard glow for the featured profile card */
+.gold-glow {
+  box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.9), 0 0 28px rgba(251, 191, 36, 0.45);
 }
