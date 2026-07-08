@@ -8,6 +8,7 @@ import ProfileDetail from './pages/ProfileDetail';
 import ProfileEdit from './pages/ProfileEdit';
 import Admin from './pages/Admin';
 import Settings from './pages/Settings';
+import Support from './pages/Support';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -15,7 +16,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-white/50">
-        <div className="animate-pulse text-lg tracking-wide">Brookeslist…</div>
+        <div className="animate-pulse text-lg tracking-wide">Brooke's List…</div>
       </div>
     );
   }
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="/profile/:id/edit" element={<ProfileEdit />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/support" element={<Support />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>

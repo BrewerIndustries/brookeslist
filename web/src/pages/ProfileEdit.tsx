@@ -102,7 +102,7 @@ export default function ProfileEdit() {
           <input className={input} value={form.name} onChange={(e) => set('name', e.target.value)} required />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={label}>Birthday</label>
             <input type="date" className={input} value={form.birthday} onChange={(e) => set('birthday', e.target.value)} />
@@ -116,7 +116,7 @@ export default function ProfileEdit() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className={label}>Height</label>
             {us ? (

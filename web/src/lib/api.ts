@@ -43,6 +43,9 @@ export const api = {
     req<{ user: User }>('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }).then((r) => r.user),
   logout: () => req<{ ok: true }>('/auth/logout', { method: 'POST' }),
 
+  sendFeedback: (data: { category?: string; subject?: string; message: string; page_url?: string }) =>
+    req<{ ok: true }>('/feedback', { method: 'POST', body: JSON.stringify(data) }),
+
   listProfiles: () => req<{ profiles: ProfileCard[] }>('/profiles').then((r) => r.profiles),
   getProfile: (id: string) => req<ProfileDetail>(`/profiles/${id}`),
   createProfile: (data: Partial<Profile>) =>
@@ -58,6 +61,8 @@ export const api = {
     fd.append('file', file);
     return req<{ photo: Photo }>(`/profiles/${profileId}/photos`, { method: 'POST', body: fd }).then((r) => r.photo);
   },
+  addPhotoUrl: (profileId: string, url: string) =>
+    req<{ photo: Photo }>(`/profiles/${profileId}/photos/url`, { method: 'POST', body: JSON.stringify({ url }) }).then((r) => r.photo),
   deletePhoto: (photoId: string) => req<{ ok: true }>(`/photos/${photoId}`, { method: 'DELETE' }),
 
   addDate: (profileId: string, data: Partial<DateLog>) =>

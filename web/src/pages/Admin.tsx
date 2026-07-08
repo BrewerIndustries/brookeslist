@@ -47,14 +47,14 @@ export default function Admin() {
     catch (err: any) { setError(err.message); }
   }
 
-  const input = 'rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40';
+  const input = 'w-full sm:w-auto rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40';
 
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="mb-5 text-2xl font-bold">Users</h1>
       {error && <div className="mb-4 rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</div>}
 
-      <form onSubmit={create} className="mb-6 flex flex-wrap items-end gap-2 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10">
+      <form onSubmit={create} className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 sm:flex sm:flex-wrap sm:items-end">
         <div>
           <label className="mb-1 block text-xs text-white/40">Email</label>
           <input type="email" required className={input} value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
@@ -81,8 +81,8 @@ export default function Admin() {
       {!users ? (
         <div className="py-10 text-center text-white/40">Loading…</div>
       ) : (
-        <div className="overflow-hidden rounded-2xl ring-1 ring-white/10">
-          <table className="w-full text-left text-sm">
+        <div className="overflow-x-auto rounded-2xl ring-1 ring-white/10">
+          <table className="w-full min-w-[520px] text-left text-sm">
             <thead className="bg-white/5 text-xs uppercase tracking-wide text-white/40">
               <tr>
                 <th className="px-4 py-2">Email</th>

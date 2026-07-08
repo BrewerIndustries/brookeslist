@@ -9,6 +9,7 @@ type Bindings = {
   PHOTOS: R2Bucket;
   ALLOWED_ORIGIN: string;
   SESSION_SECRET: string;
+  JARVIS_INGEST_TOKEN: string;
 };
 
 type SessionUser = {
@@ -68,6 +69,16 @@ const requireEditor = async (c: any, next: any) => {
 
 const requireAdmin = async (c: any, next: any) => {
   if (c.get('user').role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  await next();
+};
+
+// Bearer-token auth for the Jarvis server's feedback poller (not a browser session).
+const jarvisAuth = async (c: any, next: any) => {
+  const hdr = c.req.header('Authorization') || '';
+  const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : '';
+  if (!c.env.JARVIS_INGEST_TOKEN || token !== c.env.JARVIS_INGEST_TOKEN) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
   await next();
 };
 
@@ -300,6 +311,46 @@ app.post('/profiles/:id/photos', auth, requireEditor, async (c) => {
   return c.json({ photo: { id, r2_key: key, content_type: file.type, sort_order: order, created_at: ts } }, 201);
 });
 
+// Scrape an image from a URL, store it in R2 (same as a direct upload).
+app.post('/profiles/:id/photos/url', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const exists = await c.env.DB.prepare('SELECT id FROM profiles WHERE id = ?').bind(profileId).first();
+  if (!exists) return c.json({ error: 'not found' }, 404);
+
+  const b = await c.req.json().catch(() => ({} as any));
+  const url = String(b.url ?? '').trim();
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return c.json({ error: 'invalid URL' }, 400); }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return c.json({ error: 'URL must start with http:// or https://' }, 400);
+  }
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, { headers: { 'User-Agent': 'BrookeslistBot/1.0', Accept: 'image/*' }, redirect: 'follow' });
+  } catch {
+    return c.json({ error: 'could not reach that URL' }, 502);
+  }
+  if (!resp.ok) return c.json({ error: `fetch failed (HTTP ${resp.status})` }, 502);
+  const ct = (resp.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (!ct.startsWith('image/')) return c.json({ error: 'that URL is not an image' }, 415);
+  const buf = await resp.arrayBuffer();
+  if (buf.byteLength === 0) return c.json({ error: 'the image was empty' }, 400);
+  if (buf.byteLength > MAX_PHOTO_BYTES) return c.json({ error: 'image too large (max 10MB)' }, 413);
+
+  const ext = (ct.split('/')[1] || 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';
+  const key = `${profileId}/${uuid()}.${ext}`;
+  await c.env.PHOTOS.put(key, buf, { httpMetadata: { contentType: ct } });
+
+  const id = uuid();
+  const ts = now();
+  await c.env.DB.prepare(
+    'INSERT INTO profile_photos (id, profile_id, r2_key, content_type, sort_order, created_at) VALUES (?,?,?,?,?,?)',
+  ).bind(id, profileId, key, ct, ts, ts).run();
+  await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
+  return c.json({ photo: { id, r2_key: key, content_type: ct, sort_order: ts, created_at: ts } }, 201);
+});
+
 app.delete('/photos/:id', auth, requireEditor, async (c) => {
   const id = c.req.param('id');
   const row = await c.env.DB.prepare('SELECT r2_key FROM profile_photos WHERE id = ?').bind(id).first();
@@ -418,6 +469,46 @@ app.delete('/admin/users/:id', auth, requireAdmin, async (c) => {
     c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id),
   ]);
   return c.json({ ok: true });
+});
+
+// ---------------- feedback / support ----------------
+app.post('/feedback', auth, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const message = String(b.message ?? '').trim();
+  if (!message) return c.json({ error: 'a message is required' }, 400);
+  const user = c.get('user');
+  const id = uuid();
+  await c.env.DB.prepare(
+    `INSERT INTO feedback (id, user_email, user_id, category, subject, message, page_url, status, created_at)
+     VALUES (?,?,?,?,?,?,?, 'new', ?)`,
+  ).bind(
+    id, user.email, user.id,
+    b.category ? String(b.category).slice(0, 40) : null,
+    b.subject ? String(b.subject).slice(0, 200) : null,
+    message.slice(0, 5000),
+    b.page_url ? String(b.page_url).slice(0, 500) : null,
+    now(),
+  ).run();
+  return c.json({ ok: true }, 201);
+});
+
+// Jarvis pulls new feedback, emails Dan, then acks. Bearer-token protected.
+app.get('/feedback/pending', jarvisAuth, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, user_email, category, subject, message, page_url, created_at FROM feedback WHERE status = 'new' ORDER BY created_at LIMIT 50",
+  ).all();
+  return c.json({ feedback: results });
+});
+
+app.post('/feedback/ack', jarvisAuth, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const ids = Array.isArray(b.ids) ? b.ids.filter((x: any) => typeof x === 'string') : [];
+  if (!ids.length) return c.json({ ok: true, acked: 0 });
+  const ts = now();
+  await c.env.DB.batch(
+    ids.map((id: string) => c.env.DB.prepare("UPDATE feedback SET status = 'sent', sent_at = ? WHERE id = ? AND status = 'new'").bind(ts, id)),
+  );
+  return c.json({ ok: true, acked: ids.length });
 });
 
 export default app;

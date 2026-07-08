@@ -26,8 +26,8 @@ export default function Login() {
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-black tracking-tight">
-            <span className="text-rose-200">Brookes</span>
-            <span className="text-violet-300">list</span>
+            <span className="text-rose-200">Brooke's</span>
+            <span className="text-violet-300"> List</span>
           </h1>
           <p className="mt-2 text-sm text-white/40">Sign in to continue</p>
         </div>

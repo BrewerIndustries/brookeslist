@@ -15,6 +15,8 @@ export default function ProfileDetail() {
   const [data, setData] = useState<Detail | null>(null);
   const [error, setError] = useState('');
   const [active, setActive] = useState(0);
+  const [urlInput, setUrlInput] = useState('');
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = () => api.getProfile(id).then(setData).catch((e) => setError(e.message));
@@ -34,11 +36,27 @@ export default function ProfileDetail() {
     e.preventDefault();
     const file = fileRef.current?.files?.[0];
     if (!file) return;
+    setError('');
+    setUploading(true);
     try {
       await api.addPhoto(id, file);
       if (fileRef.current) fileRef.current.value = '';
       await load();
     } catch (err: any) { setError(err.message); }
+    finally { setUploading(false); }
+  }
+
+  async function uploadFromUrl(e: FormEvent) {
+    e.preventDefault();
+    if (!urlInput.trim()) return;
+    setError('');
+    setUploading(true);
+    try {
+      await api.addPhotoUrl(id, urlInput.trim());
+      setUrlInput('');
+      await load();
+    } catch (err: any) { setError(err.message); }
+    finally { setUploading(false); }
   }
 
   async function removePhoto(photo: Photo) {
@@ -94,10 +112,24 @@ export default function ProfileDetail() {
             </div>
           )}
           {canEdit && (
-            <form onSubmit={upload} className="mt-3 flex items-center gap-2">
-              <input ref={fileRef} type="file" accept="image/*" className="block w-full text-xs text-white/50 file:mr-2 file:rounded-md file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white/80" />
-              <button type="submit" className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">Upload</button>
-            </form>
+            <div className="mt-3 space-y-2">
+              <form onSubmit={upload} className="flex items-center gap-2">
+                <input ref={fileRef} type="file" accept="image/*" className="block w-full text-xs text-white/50 file:mr-2 file:rounded-md file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white/80" />
+                <button type="submit" disabled={uploading} className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20 disabled:opacity-50">Upload</button>
+              </form>
+              <form onSubmit={uploadFromUrl} className="flex items-center gap-2">
+                <input
+                  type="url"
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  placeholder="…or paste an image URL"
+                  className="min-w-0 flex-1 rounded-lg bg-black/30 px-3 py-1.5 text-xs ring-1 ring-white/10 outline-none focus:ring-rose-400/40"
+                />
+                <button type="submit" disabled={uploading || !urlInput.trim()} className="shrink-0 rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20 disabled:opacity-50">
+                  {uploading ? '…' : 'Add'}
+                </button>
+              </form>
+            </div>
           )}
         </div>
 
