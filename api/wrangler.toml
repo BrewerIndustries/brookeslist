@@ -1,18 +1,22 @@
 # Brookeslist API — Cloudflare Worker (prod = default env, dev = [env.dev]).
-# Fill the two PLACEHOLDER database ids after `wrangler d1 create` (see README).
 
 name = "brookeslist-api"
 main = "src/index.ts"
 compatibility_date = "2024-11-06"
 
 # ---------------- PROD (default) ----------------
+# custom_domain=true makes `wrangler deploy` create the DNS record + edge cert.
+routes = [
+  { pattern = "brookeslist-api.dabrewer.dev", custom_domain = true }
+]
+
 [vars]
 ALLOWED_ORIGIN = "https://brookeslist.dabrewer.dev"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "brookeslist-prod"
-database_id = "PLACEHOLDER_PROD_D1_ID"
+database_id = "5f4dccce-a059-4bf3-ac40-dd06bde3b590"
 
 [[r2_buckets]]
 binding = "PHOTOS"
@@ -21,6 +25,9 @@ bucket_name = "brookeslist-photos-prod"
 # ---------------- DEV ----------------
 [env.dev]
 name = "brookeslist-api-dev"
+routes = [
+  { pattern = "brookeslist-api-dev.dabrewer.dev", custom_domain = true }
+]
 
 [env.dev.vars]
 ALLOWED_ORIGIN = "https://brookeslist.dabrewer.dev"
@@ -28,7 +35,7 @@ ALLOWED_ORIGIN = "https://brookeslist.dabrewer.dev"
 [[env.dev.d1_databases]]
 binding = "DB"
 database_name = "brookeslist-dev"
-database_id = "PLACEHOLDER_DEV_D1_ID"
+database_id = "8b9e9a1f-af60-4f83-bd13-92981d96f1c9"
 
 [[env.dev.r2_buckets]]
 binding = "PHOTOS"
