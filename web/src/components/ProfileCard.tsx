@@ -22,12 +22,12 @@ export default function ProfileCard({ p }: { p: Card }) {
   return (
     <Link
       to={`/profile/${p.id}`}
-      className={`group flex overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
+      className={`group flex aspect-square overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
         isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:ring-ink/20'
       }`}
     >
-      {/* Left: photo (fills the card height) */}
-      <div className="relative w-28 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20 sm:w-32">
+      {/* Left: photo — the larger column (~60%), full card height */}
+      <div className="relative h-full basis-3/5 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20">
         {p.photo_key ? (
           <img
             src={photoUrl(p.photo_key)}
@@ -36,7 +36,7 @@ export default function ProfileCard({ p }: { p: Card }) {
             style={{ objectPosition: `${p.photo_focal_x}% ${p.photo_focal_y}%` }}
           />
         ) : (
-          <div className="flex h-full min-h-32 w-full items-center justify-center text-5xl font-black text-ink/25">
+          <div className="flex h-full w-full items-center justify-center text-6xl font-black text-ink/25">
             {p.name.charAt(0).toUpperCase()}
           </div>
         )}
@@ -49,8 +49,8 @@ export default function ProfileCard({ p }: { p: Card }) {
         )}
       </div>
 
-      {/* Right: name + stacked stat list + rating */}
-      <div className={`flex min-w-0 flex-1 flex-col gap-1.5 p-3 ${isGold ? 'bg-amber-400/10' : ''}`}>
+      {/* Right: name + stacked stat list + rating (smaller column) */}
+      <div className={`flex min-w-0 flex-1 flex-col gap-1.5 overflow-hidden p-3 ${isGold ? 'bg-amber-400/10' : ''}`}>
         <div className="flex items-center gap-1.5 text-base font-semibold text-ink">
           {isGold && <span className="text-amber-400">★</span>}
           <span className="truncate">{p.name}</span>
