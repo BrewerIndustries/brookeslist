@@ -4,7 +4,7 @@
   "description": "A private, invite-only dating logbook — a catalog of profiles (photos + stats) with per-profile date logs, notes, and a 0–5 star rating. React + Vite frontend on GitHub Pages backed by a Cloudflare Worker (Hono) + D1 + R2, with real login-gated access and viewer/editor roles.",
   "category": "standalone",
   "tech": ["React 19", "Vite", "Tailwind CSS v4", "Cloudflare Workers", "Hono", "D1 (SQLite)", "R2", "GitHub Pages"],
-  "status": { "prod": "in_progress", "dev": "in_progress" },
+  "status": { "prod": "live", "dev": "live" },
   "deploy": {
     "prod": { "url": "https://brookeslist.dabrewer.dev/" },
     "dev": { "url": "https://brookeslist.dabrewer.dev/dev/" }
