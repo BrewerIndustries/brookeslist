@@ -21,6 +21,7 @@ export default function ProfileDetail() {
   const [focal, setFocal] = useState({ x: 50, y: 50 });
   const [savingFocal, setSavingFocal] = useState(false);
   const [bgBusy, setBgBusy] = useState(false);
+  const [bgError, setBgError] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -109,19 +110,36 @@ export default function ProfileDetail() {
   }
   async function removeBg() {
     setBgBusy(true);
-    setError('');
+    setBgError('');
     const addedIndex = photos.length; // new photo appends to the end
     try {
       const { removeBackground } = await import('@imgly/background-removal');
       const srcBlob = await (await fetch(photoUrl(photos[active].r2_key), { credentials: 'include' })).blob();
-      const outBlob = await removeBackground(srcBlob);
-      const file = new File([outBlob], `nobg-${Date.now()}.png`, { type: 'image/png' });
+      const cutout = await removeBackground(srcBlob);
+      // Cap size (a full-res PNG w/ alpha can blow past the 10MB upload limit → 413).
+      const file = await downscalePng(cutout, 1400);
       await api.addPhoto(id, file);
       await load();
       setActive(addedIndex);
     } catch (err: any) {
-      setError('Background removal failed: ' + (err?.message || err));
+      setBgError(err?.message ? `Couldn't remove background: ${err.message}` : 'Background removal failed.');
     } finally { setBgBusy(false); }
+  }
+
+  // Downscale + re-encode a PNG (preserving transparency) so uploads stay small.
+  async function downscalePng(blob: Blob, maxDim: number): Promise<File> {
+    const bmp = await createImageBitmap(blob);
+    const scale = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale);
+    const h = Math.round(bmp.height * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
+    const out: Blob = await new Promise((res, rej) =>
+      canvas.toBlob((b) => (b ? res(b) : rej(new Error('encode failed'))), 'image/png'),
+    );
+    return new File([out], `nobg-${Date.now()}.png`, { type: 'image/png' });
   }
 
   const extraEntries = Object.entries(profile.extra || {});
@@ -159,7 +177,12 @@ export default function ProfileDetail() {
                 Drag the photo to reposition
               </div>
             )}
-            {isGold && !repositioning && (
+            {bgBusy && (
+              <div className="absolute inset-0 grid place-items-center bg-black/50">
+                <div className="h-12 w-12 animate-spin rounded-full border-4 border-white/25 border-t-white" />
+              </div>
+            )}
+            {isGold && !repositioning && !bgBusy && (
               <div className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-amber-400 text-black shadow-lg ring-2 ring-amber-200/60" title="Gold standard">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77 5.82 21l1.18-6.88-5-4.87 6.91-1.01L12 2z" />
@@ -180,14 +203,15 @@ export default function ProfileDetail() {
               ) : (
                 <>
                   <button onClick={startReposition} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20">Reposition</button>
-                  <button onClick={removeBg} disabled={bgBusy} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20 disabled:opacity-50">
-                    {bgBusy ? 'Removing…' : 'Remove background'}
+                  <button onClick={removeBg} disabled={bgBusy} className="flex items-center gap-2 rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20 disabled:opacity-50">
+                    {bgBusy && <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-ink/30 border-t-ink/80" />}
+                    Remove background
                   </button>
                 </>
               )}
             </div>
           )}
-          {bgBusy && <p className="mt-1 text-xs text-ink/40">Removing background — first run downloads a model, this can take a bit…</p>}
+          {bgError && <p className="mt-1 text-xs text-rose-500">{bgError}</p>}
           {photos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {photos.map((ph, i) => (

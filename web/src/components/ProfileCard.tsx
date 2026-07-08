@@ -1,24 +1,33 @@
 import { Link } from 'react-router-dom';
 import type { ProfileCard as Card } from '../lib/types';
 import { photoUrl } from '../lib/api';
-import { formatHeight } from '../lib/format';
+import { formatHeight, formatWeight } from '../lib/format';
 import { useSettings } from '../settings/SettingsContext';
 import StarRating from './StarRating';
+
+function Row({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="shrink-0 text-xs text-ink/40">{label}</span>
+      <span className="truncate text-sm text-ink/80">{value}</span>
+    </div>
+  );
+}
 
 export default function ProfileCard({ p }: { p: Card }) {
   const { config } = useSettings();
   const isGold = config.gold_standard_id === p.id;
-  const stats = [p.sign, p.body_type, formatHeight(p.height_cm, config.units)].filter(Boolean).join(' · ');
 
   return (
     <Link
       to={`/profile/${p.id}`}
-      className={`group flex min-h-[8.5rem] overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
+      className={`group flex overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
         isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:ring-ink/20'
       }`}
     >
-      {/* Left: photo */}
-      <div className="relative w-28 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20 sm:w-36">
+      {/* Left: photo (fills the card height) */}
+      <div className="relative w-28 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20 sm:w-32">
         {p.photo_key ? (
           <img
             src={photoUrl(p.photo_key)}
@@ -27,7 +36,7 @@ export default function ProfileCard({ p }: { p: Card }) {
             style={{ objectPosition: `${p.photo_focal_x}% ${p.photo_focal_y}%` }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-5xl font-black text-ink/25">
+          <div className="flex h-full min-h-32 w-full items-center justify-center text-5xl font-black text-ink/25">
             {p.name.charAt(0).toUpperCase()}
           </div>
         )}
@@ -40,14 +49,21 @@ export default function ProfileCard({ p }: { p: Card }) {
         )}
       </div>
 
-      {/* Right: data */}
-      <div className={`flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-4 ${isGold ? 'bg-amber-400/10' : ''}`}>
-        <div className="flex items-center gap-1.5 text-lg font-semibold text-ink">
+      {/* Right: name + stacked stat list + rating */}
+      <div className={`flex min-w-0 flex-1 flex-col gap-1.5 p-3 ${isGold ? 'bg-amber-400/10' : ''}`}>
+        <div className="flex items-center gap-1.5 text-base font-semibold text-ink">
           {isGold && <span className="text-amber-400">★</span>}
           <span className="truncate">{p.name}</span>
         </div>
-        {stats && <div className="truncate text-sm text-ink/50">{stats}</div>}
-        <StarRating value={p.rating} size={18} showNumber={p.rating > 0} />
+        <div className="space-y-0.5">
+          <Row label="Sign" value={p.sign} />
+          <Row label="Body" value={p.body_type} />
+          <Row label="Height" value={formatHeight(p.height_cm, config.units)} />
+          <Row label="Weight" value={formatWeight(p.weight_kg, config.units)} />
+        </div>
+        <div className="mt-auto pt-1">
+          <StarRating value={p.rating} size={15} showNumber={p.rating > 0} />
+        </div>
       </div>
     </Link>
   );

@@ -28,8 +28,10 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 // ---------------- CORS ----------------
 app.use('*', cors({
   origin: (origin, c) => {
-    const allowed = [c.env.ALLOWED_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'];
-    return allowed.includes(origin) ? origin : allowed[0];
+    if (origin === c.env.ALLOWED_ORIGIN) return origin;
+    // any localhost port during local dev
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '')) return origin;
+    return c.env.ALLOWED_ORIGIN;
   },
   credentials: true,
   allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
