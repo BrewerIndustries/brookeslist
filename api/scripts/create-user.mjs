@@ -49,6 +49,11 @@ const sql =
   `INSERT INTO users (id,email,password_hash,role,display_name,created_at) VALUES ` +
   `(${q(id)},${q(email)},${q(stored)},${q(role)},${q(name)},${Date.now()});`;
 
+// The dev D1 binding lives under [env.dev], so remote dev commands need --env dev.
+const wranglerArgs = ['wrangler', 'd1', 'execute', dbName];
+if (env === 'dev' && !args.local) wranglerArgs.push('--env', 'dev');
+wranglerArgs.push(target, '--command', sql);
+
 console.log(`Creating ${role} "${email}" in ${dbName} (${target})...`);
-execFileSync('npx', ['wrangler', 'd1', 'execute', dbName, target, '--command', sql], { stdio: 'inherit' });
+execFileSync('npx', wranglerArgs, { stdio: 'inherit' });
 console.log('Done.');
