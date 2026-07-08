@@ -31,8 +31,8 @@ export default function Catalog() {
     return filtered;
   }, [profiles, q, sort]);
 
-  if (error) return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-200">{error}</div>;
-  if (!profiles) return <div className="py-20 text-center text-white/40">Loading…</div>;
+  if (error) return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-500">{error}</div>;
+  if (!profiles) return <div className="py-20 text-center text-ink/40">Loading…</div>;
 
   return (
     <div>
@@ -41,23 +41,23 @@ export default function Catalog() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search names…"
-          className="w-48 rounded-lg bg-white/5 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40"
+          className="w-48 rounded-lg bg-ink/5 px-3 py-1.5 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40"
         />
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value as Sort)}
-          className="rounded-lg bg-white/5 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none"
+          className="rounded-lg bg-ink/5 px-3 py-1.5 text-sm ring-1 ring-ink/10 outline-none"
         >
           <option value="recent">Recently updated</option>
           <option value="rating">Highest rated</option>
           <option value="name">Name (A–Z)</option>
         </select>
-        <span className="ml-auto text-sm text-white/40">{shown.length} profile{shown.length === 1 ? '' : 's'}</span>
+        <span className="ml-auto text-sm text-ink/40">{shown.length} profile{shown.length === 1 ? '' : 's'}</span>
       </div>
 
       {shown.length === 0 ? (
-        <div className="rounded-2xl bg-white/5 p-12 text-center ring-1 ring-white/10">
-          <p className="text-white/50">No profiles yet.</p>
+        <div className="rounded-2xl bg-ink/5 p-12 text-center ring-1 ring-ink/10">
+          <p className="text-ink/50">No profiles yet.</p>
           {canEdit && (
             <Link to="/profile/new" className="mt-3 inline-block rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-400">
               Create the first one

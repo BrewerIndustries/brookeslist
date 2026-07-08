@@ -108,6 +108,7 @@ const DEFAULT_CONFIG = {
   body_types: ['Slim', 'Athletic', 'Average', 'Curvy', 'Muscular', 'Plus-size', 'Petite', 'Tall'],
   stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
   rating_half_steps: true,
+  gold_standard_id: null as string | null,
 };
 
 async function getConfig(c: any) {
@@ -179,6 +180,7 @@ app.put('/admin/settings', auth, requireAdmin, async (c) => {
   if (b.body_types !== undefined) next.body_types = cleanList(b.body_types);
   if (b.stat_presets !== undefined) next.stat_presets = cleanList(b.stat_presets);
   if (typeof b.rating_half_steps === 'boolean') next.rating_half_steps = b.rating_half_steps;
+  if (b.gold_standard_id !== undefined) next.gold_standard_id = b.gold_standard_id ? String(b.gold_standard_id) : null;
   await c.env.DB.prepare(
     "INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).bind(JSON.stringify(next)).run();

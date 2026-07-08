@@ -158,6 +158,14 @@ by any signed-in user; `PUT /admin/settings` is admin-only. Current options:
 - **Body types** — the list offered in the profile editor's body-type field.
 - **Custom stat labels** — suggested labels for a profile's free-form "Other stats".
 - **Ratings** — toggle half-star ratings (e.g. 3.5) on/off.
+- **Gold standard** — feature one profile as the perfect candidate: its card glows gold
+  with a star badge, and the detail page gets a "Gold standard" ribbon. Stored as
+  `gold_standard_id` (a profile id or null).
+
+**Theme** — a light/dark toggle (in the header, all users) persists per-browser in
+`localStorage`. Light mode is white + pink; dark is the default. Theming works via a
+single `ink` CSS-variable color token that flips between near-white and near-black, so
+every `ink/opacity` surface inverts correctly (see `web/src/index.css`, `theme/ThemeContext.tsx`).
 
 Missing keys fall back to defaults in the Worker (`DEFAULT_CONFIG`), so the config is
 forward-compatible as new options are added.

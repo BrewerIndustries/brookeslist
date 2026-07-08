@@ -56,7 +56,7 @@ export default function StarRating({ value, onChange, size = 22, showNumber = tr
           );
         })}
       </div>
-      {showNumber && <span className="ml-1 text-sm tabular-nums text-white/60">{shown.toFixed(1)}</span>}
+      {showNumber && <span className="ml-1 text-sm tabular-nums text-ink/60">{shown.toFixed(1)}</span>}
     </div>
   );
 }

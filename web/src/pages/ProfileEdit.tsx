@@ -51,7 +51,7 @@ export default function ProfileEdit() {
     }).catch((e) => setError(e.message));
   }, [id, editing, us]);
 
-  if (!canEdit) return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-200">You don't have permission to edit.</div>;
+  if (!canEdit) return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-500">You don't have permission to edit.</div>;
 
   function set<K extends keyof FormState>(k: K, v: FormState[K]) {
     setForm((f) => ({ ...f, [k]: v }));
@@ -90,13 +90,13 @@ export default function ProfileEdit() {
     }
   }
 
-  const input = 'w-full rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40';
-  const label = 'mb-1 block text-xs font-medium uppercase tracking-wide text-white/40';
+  const input = 'w-full rounded-lg bg-field px-3 py-2 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40';
+  const label = 'mb-1 block text-xs font-medium uppercase tracking-wide text-ink/40';
 
   return (
     <div className="mx-auto max-w-xl">
       <h1 className="mb-5 text-2xl font-bold">{editing ? 'Edit profile' : 'New profile'}</h1>
-      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-ink/5 p-6 ring-1 ring-ink/10">
         <div>
           <label className={label}>Name *</label>
           <input className={input} value={form.name} onChange={(e) => set('name', e.target.value)} required />
@@ -122,14 +122,14 @@ export default function ProfileEdit() {
             {us ? (
               <div className="flex items-center gap-2">
                 <input type="number" min={0} max={8} placeholder="ft" className={input + ' w-20'} value={form.ft} onChange={(e) => set('ft', e.target.value)} />
-                <span className="text-white/40">ft</span>
+                <span className="text-ink/40">ft</span>
                 <input type="number" min={0} max={11} placeholder="in" className={input + ' w-20'} value={form.inch} onChange={(e) => set('inch', e.target.value)} />
-                <span className="text-white/40">in</span>
+                <span className="text-ink/40">in</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
                 <input type="number" min={0} placeholder="cm" className={input} value={form.cm} onChange={(e) => set('cm', e.target.value)} />
-                <span className="text-white/40">cm</span>
+                <span className="text-ink/40">cm</span>
               </div>
             )}
           </div>
@@ -137,7 +137,7 @@ export default function ProfileEdit() {
             <label className={label}>Weight</label>
             <div className="flex items-center gap-2">
               <input type="number" min={0} placeholder={us ? 'lb' : 'kg'} className={input} value={form.weight} onChange={(e) => set('weight', e.target.value)} />
-              <span className="text-white/40">{us ? 'lb' : 'kg'}</span>
+              <span className="text-ink/40">{us ? 'lb' : 'kg'}</span>
             </div>
           </div>
         </div>
@@ -157,27 +157,27 @@ export default function ProfileEdit() {
                 <input placeholder="Value" className={input} value={row.value}
                   onChange={(e) => set('extra', form.extra.map((r, j) => j === i ? { ...r, value: e.target.value } : r))} />
                 <button type="button" onClick={() => set('extra', form.extra.filter((_, j) => j !== i))}
-                  className="rounded-lg px-2 text-white/40 hover:text-rose-300">×</button>
+                  className="rounded-lg px-2 text-ink/40 hover:text-rose-300">×</button>
               </div>
             ))}
             <datalist id="stat-presets">
               {config.stat_presets.map((s) => <option key={s} value={s} />)}
             </datalist>
             <button type="button" onClick={() => set('extra', [...form.extra, { key: '', value: '' }])}
-              className="text-sm text-rose-300 hover:text-rose-200">+ Add stat</button>
+              className="text-sm text-rose-300 hover:text-rose-500">+ Add stat</button>
           </div>
         </div>
 
-        {error && <div className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</div>}
+        {error && <div className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-500">{error}</div>}
 
         <div className="flex gap-2">
           <button type="submit" disabled={busy} className="rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">
             {busy ? 'Saving…' : editing ? 'Save changes' : 'Create profile'}
           </button>
-          <button type="button" onClick={() => navigate(-1)} className="rounded-lg px-4 py-2 text-sm text-white/60 hover:bg-white/10">Cancel</button>
+          <button type="button" onClick={() => navigate(-1)} className="rounded-lg px-4 py-2 text-sm text-ink/60 hover:bg-ink/10">Cancel</button>
         </div>
       </form>
-      {!editing && <p className="mt-3 text-center text-xs text-white/30">You can add photos after creating the profile.</p>}
+      {!editing && <p className="mt-3 text-center text-xs text-ink/30">You can add photos after creating the profile.</p>}
     </div>
   );
 }

@@ -43,20 +43,20 @@ export default function Support() {
     }
   }
 
-  const input = 'w-full rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40';
-  const label = 'mb-1 block text-xs font-medium uppercase tracking-wide text-white/40';
+  const input = 'w-full rounded-lg bg-field px-3 py-2 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40';
+  const label = 'mb-1 block text-xs font-medium uppercase tracking-wide text-ink/40';
 
   if (status === 'sent') {
     return (
       <div className="mx-auto max-w-lg py-10 text-center">
         <div className="mb-3 text-5xl">📨</div>
         <h1 className="text-2xl font-bold">Thanks — sent to Jarvis</h1>
-        <p className="mt-2 text-sm text-white/50">Jarvis will email your feedback along. We appreciate it!</p>
+        <p className="mt-2 text-sm text-ink/50">Jarvis will email your feedback along. We appreciate it!</p>
         <div className="mt-6 flex justify-center gap-2">
-          <Link to="/" className="rounded-lg bg-white/10 px-4 py-2 text-sm hover:bg-white/20">Back to catalog</Link>
+          <Link to="/" className="rounded-lg bg-ink/10 px-4 py-2 text-sm hover:bg-ink/20">Back to catalog</Link>
           <button
             onClick={() => { setStatus('idle'); setSubject(''); setMessage(TEMPLATES[category]); setTouched(false); }}
-            className="rounded-lg px-4 py-2 text-sm text-white/60 hover:bg-white/10"
+            className="rounded-lg px-4 py-2 text-sm text-ink/60 hover:bg-ink/10"
           >Send another</button>
         </div>
       </div>
@@ -66,9 +66,9 @@ export default function Support() {
   return (
     <div className="mx-auto max-w-lg">
       <h1 className="mb-1 text-2xl font-bold">Support &amp; feedback</h1>
-      <p className="mb-6 text-sm text-white/40">Send a note to Jarvis — it'll be emailed straight to Dan.</p>
+      <p className="mb-6 text-sm text-ink/40">Send a note to Jarvis — it'll be emailed straight to Dan.</p>
 
-      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-white/5 p-6 ring-1 ring-white/10">
+      <form onSubmit={submit} className="space-y-4 rounded-2xl bg-ink/5 p-6 ring-1 ring-ink/10">
         <div>
           <label className={label}>Type</label>
           <div className="flex flex-wrap gap-2">
@@ -78,7 +78,7 @@ export default function Support() {
                 type="button"
                 onClick={() => pickCategory(c)}
                 className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
-                  category === c ? 'bg-rose-500 text-white ring-rose-400' : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10'
+                  category === c ? 'bg-rose-500 text-white ring-rose-400' : 'bg-ink/5 text-ink/70 ring-ink/10 hover:bg-ink/10'
                 }`}
               >{c}</button>
             ))}
@@ -101,13 +101,13 @@ export default function Support() {
           />
         </div>
 
-        {status === 'error' && <div className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-200">{error}</div>}
+        {status === 'error' && <div className="rounded-lg bg-rose-500/15 px-3 py-2 text-sm text-rose-500">{error}</div>}
 
         <div className="flex gap-2">
           <button type="submit" disabled={status === 'sending' || !message.trim()} className="rounded-lg bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">
             {status === 'sending' ? 'Sending…' : 'Send to Jarvis'}
           </button>
-          <Link to="/" className="rounded-lg px-4 py-2 text-sm text-white/60 hover:bg-white/10">Cancel</Link>
+          <Link to="/" className="rounded-lg px-4 py-2 text-sm text-ink/60 hover:bg-ink/10">Cancel</Link>
         </div>
       </form>
     </div>

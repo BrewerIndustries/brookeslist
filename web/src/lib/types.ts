@@ -29,6 +29,7 @@ export interface AppConfig {
   body_types: string[];
   stat_presets: string[];
   rating_half_steps: boolean;
+  gold_standard_id: string | null;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -36,6 +37,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   body_types: ['Slim', 'Athletic', 'Average', 'Curvy', 'Muscular', 'Plus-size', 'Petite', 'Tall'],
   stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
   rating_half_steps: true,
+  gold_standard_id: null,
 };
 
 export interface ProfileCard extends Profile {

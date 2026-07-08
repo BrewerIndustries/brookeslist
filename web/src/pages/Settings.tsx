@@ -1,20 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useSettings } from '../settings/SettingsContext';
-import type { AppConfig, Units } from '../lib/types';
+import { api } from '../lib/api';
+import type { AppConfig, ProfileCard, Units } from '../lib/types';
 
 export default function Settings() {
   const { user } = useAuth();
   const { config, save } = useSettings();
   const [draft, setDraft] = useState<AppConfig>(config);
+  const [profiles, setProfiles] = useState<ProfileCard[]>([]);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState('');
 
   // keep the draft in sync when config loads/changes
   useEffect(() => { setDraft(config); }, [config]);
+  useEffect(() => { api.listProfiles().then(setProfiles).catch(() => {}); }, []);
 
   if (user?.role !== 'admin') {
-    return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-200">Admins only.</div>;
+    return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-500">Admins only.</div>;
   }
 
   function set<K extends keyof AppConfig>(k: K, v: AppConfig[K]) {
@@ -37,7 +40,7 @@ export default function Settings() {
   return (
     <div className="mx-auto max-w-2xl">
       <h1 className="mb-1 text-2xl font-bold">Settings</h1>
-      <p className="mb-6 text-sm text-white/40">App-wide configuration. Changes apply to everyone.</p>
+      <p className="mb-6 text-sm text-ink/40">App-wide configuration. Changes apply to everyone.</p>
 
       <div className="space-y-6">
         {/* Units */}
@@ -48,13 +51,30 @@ export default function Settings() {
                 key={u}
                 onClick={() => set('units', u)}
                 className={`rounded-lg px-4 py-2 text-sm ring-1 ${
-                  draft.units === u ? 'bg-rose-500 text-white ring-rose-400' : 'bg-white/5 text-white/70 ring-white/10 hover:bg-white/10'
+                  draft.units === u ? 'bg-rose-500 text-white ring-rose-400' : 'bg-ink/5 text-ink/70 ring-ink/10 hover:bg-ink/10'
                 }`}
               >
                 {u === 'us' ? 'US (ft / in, lb)' : 'Metric (cm, kg)'}
               </button>
             ))}
           </div>
+        </Section>
+
+        {/* Gold standard */}
+        <Section title="Gold standard" subtitle="Feature one profile as the perfect candidate — its card glows gold with a star.">
+          <select
+            value={draft.gold_standard_id ?? ''}
+            onChange={(e) => set('gold_standard_id', e.target.value || null)}
+            className="w-full rounded-lg bg-field px-3 py-2 text-sm ring-1 ring-ink/10 outline-none focus:ring-amber-400/60"
+          >
+            <option value="">— None —</option>
+            {profiles.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          {draft.gold_standard_id && (
+            <p className="mt-2 text-xs text-amber-300">
+              ★ {profiles.find((p) => p.id === draft.gold_standard_id)?.name ?? 'Selected profile'} is the gold standard.
+            </p>
+          )}
         </Section>
 
         {/* Body types */}
@@ -69,7 +89,7 @@ export default function Settings() {
 
         {/* Ratings */}
         <Section title="Ratings" subtitle="How the 0–5 star rating behaves.">
-          <label className="flex items-center gap-2 text-sm text-white/80">
+          <label className="flex items-center gap-2 text-sm text-ink/80">
             <input
               type="checkbox"
               checked={draft.rating_half_steps}
@@ -98,9 +118,9 @@ export default function Settings() {
 
 function Section({ title, subtitle, children }: { title: string; subtitle?: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl bg-white/5 p-5 ring-1 ring-white/10">
-      <h2 className="text-sm font-semibold text-white">{title}</h2>
-      {subtitle && <p className="mb-3 mt-0.5 text-xs text-white/40">{subtitle}</p>}
+    <div className="rounded-2xl bg-ink/5 p-5 ring-1 ring-ink/10">
+      <h2 className="text-sm font-semibold text-ink">{title}</h2>
+      {subtitle && <p className="mb-3 mt-0.5 text-xs text-ink/40">{subtitle}</p>}
       {children}
     </div>
   );
@@ -120,16 +140,16 @@ function ListEditor({ items, onChange, placeholder }: { items: string[]; onChang
     <div>
       <div className="mb-3 flex flex-wrap gap-2">
         {items.map((item, i) => (
-          <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-white/10 py-1 pl-3 pr-1.5 text-sm">
+          <span key={item} className="inline-flex items-center gap-1.5 rounded-full bg-ink/10 py-1 pl-3 pr-1.5 text-sm">
             {item}
             <button
               onClick={() => onChange(items.filter((_, j) => j !== i))}
-              className="grid h-5 w-5 place-items-center rounded-full text-white/50 hover:bg-rose-500/30 hover:text-rose-200"
+              className="grid h-5 w-5 place-items-center rounded-full text-ink/50 hover:bg-rose-500/30 hover:text-rose-500"
               aria-label={`Remove ${item}`}
             >×</button>
           </span>
         ))}
-        {items.length === 0 && <span className="text-sm text-white/30">None yet.</span>}
+        {items.length === 0 && <span className="text-sm text-ink/30">None yet.</span>}
       </div>
       <div className="flex gap-2">
         <input
@@ -137,9 +157,9 @@ function ListEditor({ items, onChange, placeholder }: { items: string[]; onChang
           onChange={(e) => setEntry(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}
           placeholder={placeholder}
-          className="flex-1 rounded-lg bg-black/30 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none focus:ring-rose-400/40"
+          className="flex-1 rounded-lg bg-field px-3 py-1.5 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40"
         />
-        <button onClick={add} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">Add</button>
+        <button onClick={add} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20">Add</button>
       </div>
     </div>
   );

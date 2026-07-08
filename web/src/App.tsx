@@ -15,7 +15,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-white/50">
+      <div className="flex min-h-screen items-center justify-center text-ink/50">
         <div className="animate-pulse text-lg tracking-wide">Brooke's List…</div>
       </div>
     );
