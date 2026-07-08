@@ -66,6 +66,8 @@ export const api = {
   deletePhoto: (photoId: string) => req<{ ok: true }>(`/photos/${photoId}`, { method: 'DELETE' }),
   updatePhotoFocal: (photoId: string, focal_x: number, focal_y: number) =>
     req<{ ok: true }>(`/photos/${photoId}`, { method: 'PATCH', body: JSON.stringify({ focal_x, focal_y }) }),
+  reorderPhotos: (profileId: string, order: string[]) =>
+    req<{ ok: true }>(`/profiles/${profileId}/photos/order`, { method: 'POST', body: JSON.stringify({ order }) }),
 
   addDate: (profileId: string, data: Partial<DateLog>) =>
     req<{ date: DateLog }>(`/profiles/${profileId}/dates`, { method: 'POST', body: JSON.stringify(data) }).then((r) => r.date),

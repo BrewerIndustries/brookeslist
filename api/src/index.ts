@@ -358,6 +358,21 @@ app.post('/profiles/:id/photos/url', auth, requireEditor, async (c) => {
   return c.json({ photo: { id, r2_key: key, content_type: ct, sort_order: ts, created_at: ts } }, 201);
 });
 
+// Reorder a profile's photos. `order` is the full list of photo ids; index 0
+// becomes sort_order 0 = the primary photo shown on the catalog card.
+app.post('/profiles/:id/photos/order', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const b = await c.req.json().catch(() => ({} as any));
+  const order = Array.isArray(b.order) ? b.order.filter((x: any) => typeof x === 'string') : [];
+  if (!order.length) return c.json({ error: 'order required' }, 400);
+  await c.env.DB.batch(
+    order.map((pid: string, i: number) =>
+      c.env.DB.prepare('UPDATE profile_photos SET sort_order = ? WHERE id = ? AND profile_id = ?').bind(i, pid, profileId)),
+  );
+  await c.env.DB.prepare('UPDATE profiles SET updated_at = ? WHERE id = ?').bind(now(), profileId).run();
+  return c.json({ ok: true });
+});
+
 // Update a photo's focal point (0–100 each axis) for repositioning in its frame.
 app.patch('/photos/:id', auth, requireEditor, async (c) => {
   const id = c.req.param('id');

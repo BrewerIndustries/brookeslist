@@ -37,10 +37,25 @@ export default function Settings() {
     }
   }
 
+  const saveBar = (
+    <div className="flex items-center gap-3">
+      <button onClick={onSave} disabled={status === 'saving'} className="rounded-lg bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">
+        {status === 'saving' ? 'Saving…' : 'Save settings'}
+      </button>
+      {status === 'saved' && <span className="text-sm text-emerald-300">Saved ✓</span>}
+      {status === 'error' && <span className="text-sm text-rose-500">{error}</span>}
+    </div>
+  );
+
   return (
     <div className="mx-auto max-w-2xl">
-      <h1 className="mb-1 text-2xl font-bold">Settings</h1>
-      <p className="mb-6 text-sm text-ink/40">App-wide configuration. Changes apply to everyone.</p>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Settings</h1>
+          <p className="mt-1 text-sm text-ink/40">App-wide configuration. Changes apply to everyone.</p>
+        </div>
+        {saveBar}
+      </div>
 
       <div className="space-y-6">
         {/* Units */}
@@ -101,17 +116,7 @@ export default function Settings() {
         </Section>
       </div>
 
-      <div className="mt-8 flex items-center gap-3">
-        <button
-          onClick={onSave}
-          disabled={status === 'saving'}
-          className="rounded-lg bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50"
-        >
-          {status === 'saving' ? 'Saving…' : 'Save settings'}
-        </button>
-        {status === 'saved' && <span className="text-sm text-emerald-300">Saved ✓</span>}
-        {status === 'error' && <span className="text-sm text-rose-300">{error}</span>}
-      </div>
+      <div className="mt-8">{saveBar}</div>
     </div>
   );
 }

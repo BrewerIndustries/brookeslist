@@ -73,6 +73,16 @@ export default function ProfileDetail() {
     await load();
   }
 
+  async function movePhoto(i: number, dir: -1 | 1) {
+    const j = i + dir;
+    if (j < 0 || j >= photos.length) return;
+    const ids = photos.map((p) => p.id);
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    setActive(j);
+    await api.reorderPhotos(id, ids);
+    await load();
+  }
+
   async function removeProfile() {
     if (!confirm(`Delete ${profile.name}? This cannot be undone.`)) return;
     await api.deleteProfile(id);
@@ -218,16 +228,29 @@ export default function ProfileDetail() {
                 <div key={ph.id} className="relative">
                   <button
                     onClick={() => setActive(i)}
-                    className={`h-16 w-14 overflow-hidden rounded-lg ring-2 ${i === active ? 'ring-rose-400' : 'ring-transparent'}`}
+                    className={`relative block h-16 w-14 overflow-hidden rounded-lg ring-2 ${i === active ? 'ring-rose-400' : 'ring-transparent'}`}
                   >
                     <img src={photoUrl(ph.r2_key)} alt="" className="h-full w-full object-cover" style={{ objectPosition: `${ph.focal_x}% ${ph.focal_y}%` }} />
+                    {i === 0 && (
+                      <span className="absolute inset-x-0 bottom-0 bg-rose-500/90 py-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-white">On card</span>
+                    )}
                   </button>
                   {canEdit && (
-                    <button
-                      onClick={() => removePhoto(ph)}
-                      className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full bg-black/80 text-xs text-ink/80 ring-1 ring-ink/20 hover:text-rose-300"
-                      title="Delete photo"
-                    >×</button>
+                    <>
+                      <button
+                        onClick={() => removePhoto(ph)}
+                        className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full bg-black/80 text-xs text-white/80 ring-1 ring-white/20 hover:text-rose-300"
+                        title="Delete photo"
+                      >×</button>
+                      {photos.length > 1 && (
+                        <div className="mt-1 flex justify-center gap-1">
+                          <button onClick={() => movePhoto(i, -1)} disabled={i === 0} title="Move left"
+                            className="grid h-5 w-6 place-items-center rounded bg-ink/10 text-xs hover:bg-ink/20 disabled:opacity-30">◀</button>
+                          <button onClick={() => movePhoto(i, 1)} disabled={i === photos.length - 1} title="Move right"
+                            className="grid h-5 w-6 place-items-center rounded bg-ink/10 text-xs hover:bg-ink/20 disabled:opacity-30">▶</button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               ))}
