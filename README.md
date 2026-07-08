@@ -121,3 +121,20 @@ allows `localhost:5173` via CORS and omits the `Secure` cookie flag on localhost
 | View profiles/photos/dates | ✅ | ✅ | ✅ |
 | Create/edit/delete profiles, photos, dates, ratings | | ✅ | ✅ |
 | Manage users (invite / set role / reset pw) | | | ✅ |
+| App configuration (Settings page) | | | ✅ |
+
+## Configuration (admin → Settings)
+
+App-wide config lives in a D1 `settings` table (single `config` JSON row) and is
+edited from the in-app **Settings** page (admins only). `GET /settings` is readable
+by any signed-in user; `PUT /admin/settings` is admin-only. Current options:
+
+- **Units** — `us` (feet/inches, pounds — **default**) or `metric` (cm, kg). Drives
+  how height/weight are entered and displayed everywhere. Values are stored in metric
+  base columns (`height_cm`, `weight_kg`) and converted per-unit in the UI.
+- **Body types** — the list offered in the profile editor's body-type field.
+- **Custom stat labels** — suggested labels for a profile's free-form "Other stats".
+- **Ratings** — toggle half-star ratings (e.g. 3.5) on/off.
+
+Missing keys fall back to defaults in the Worker (`DEFAULT_CONFIG`), so the config is
+forward-compatible as new options are added.
