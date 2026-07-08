@@ -7,6 +7,8 @@ import { useSettings } from '../settings/SettingsContext';
 import { formatDate, formatHeight, formatWeight } from '../lib/format';
 import StarRating from '../components/StarRating';
 
+const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 export default function ProfileDetail() {
   const { id = '' } = useParams();
   const canEdit = useCanEdit();
@@ -37,6 +39,11 @@ export default function ProfileDetail() {
   async function setRating(v: number) {
     await api.setRating(id, v);
     setData((d) => (d ? { ...d, profile: { ...d.profile, rating: v } } : d));
+  }
+
+  async function setStatus(v: string) {
+    await api.updateProfile(id, { status: v });
+    setData((d) => (d ? { ...d, profile: { ...d.profile, status: v } } : d));
   }
 
   async function upload(e: FormEvent) {
@@ -295,8 +302,16 @@ export default function ProfileDetail() {
             )}
           </div>
 
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <StarRating value={profile.rating} size={28} half={config.rating_half_steps} onChange={canEdit ? setRating : undefined} />
+            {canEdit ? (
+              <select value={profile.status || 'active'} onChange={(e) => setStatus(e.target.value)}
+                className="rounded-full bg-ink/10 px-3 py-1 text-xs font-medium ring-1 ring-ink/10 outline-none">
+                {config.statuses.map((s) => <option key={s} value={s}>{cap(s)}</option>)}
+              </select>
+            ) : (
+              <span className="rounded-full bg-ink/10 px-3 py-1 text-xs font-medium">{cap(profile.status || 'active')}</span>
+            )}
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
@@ -308,12 +323,7 @@ export default function ProfileDetail() {
             {extraEntries.map(([k, v]) => <Stat key={k} label={k} value={v} />)}
           </dl>
 
-          {profile.notes && (
-            <div className="mt-6">
-              <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink/40">Notes</h2>
-              <p className="whitespace-pre-wrap text-sm text-ink/80">{profile.notes}</p>
-            </div>
-          )}
+          <NotesSection profileId={id} notes={profile.notes} canEdit={canEdit} onChange={load} />
 
           <DateLogSection profileId={id} dates={dates} canEdit={canEdit} onChange={load} />
         </div>
@@ -327,7 +337,52 @@ function Stat({ label, value }: { label: string; value?: string | null }) {
   return (
     <div>
       <dt className="text-xs uppercase tracking-wide text-ink/40">{label}</dt>
-      <dd className="mt-0.5 text-ink/90">{value}</dd>
+      <dd className="mt-0.5 break-words text-ink/90">{value}</dd>
+    </div>
+  );
+}
+
+function PlusButton({ onClick, title }: { onClick: () => void; title: string }) {
+  return (
+    <button onClick={onClick} title={title}
+      className="grid h-6 w-6 place-items-center rounded-full bg-rose-500 text-sm font-bold leading-none text-white hover:bg-rose-400">+</button>
+  );
+}
+
+function NotesSection({ profileId, notes, canEdit, onChange }: { profileId: string; notes: string | null; canEdit: boolean; onChange: () => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.updateProfile(profileId, { notes: draft.trim() || null });
+      setEditing(false);
+      await onChange();
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="mb-1 flex items-center gap-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Notes</h2>
+        {canEdit && !editing && <PlusButton title="Add / edit notes" onClick={() => { setDraft(notes || ''); setEditing(true); }} />}
+      </div>
+      {editing ? (
+        <div className="space-y-2">
+          <textarea autoFocus value={draft} onChange={(e) => setDraft(e.target.value)} rows={4} placeholder="Add notes…"
+            className="w-full rounded-lg bg-field px-3 py-2 text-sm ring-1 ring-ink/10 outline-none focus:ring-rose-400/40" />
+          <div className="flex gap-2">
+            <button onClick={save} disabled={busy} className="rounded-lg bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">{busy ? 'Saving…' : 'Save'}</button>
+            <button onClick={() => setEditing(false)} className="rounded-lg px-3 py-1.5 text-sm text-ink/60 hover:bg-ink/10">Cancel</button>
+          </div>
+        </div>
+      ) : notes ? (
+        <p className="whitespace-pre-wrap break-words text-sm text-ink/80">{notes}</p>
+      ) : (
+        <p className="text-sm text-ink/30">No notes yet.</p>
+      )}
     </div>
   );
 }
@@ -352,13 +407,11 @@ function DateLogSection({ profileId, dates, canEdit, onChange }: { profileId: st
 
   return (
     <div className="mt-8">
-      <div className="mb-2 flex items-center gap-3">
+      <div className="mb-2 flex items-center gap-2">
         <h2 className="text-xs font-semibold uppercase tracking-wide text-ink/40">Date log</h2>
-        {canEdit && (
-          <button onClick={() => setOpen((o) => !o)} className="text-sm text-rose-300 hover:text-rose-500">
-            {open ? 'Cancel' : '+ Add entry'}
-          </button>
-        )}
+        {canEdit && (open
+          ? <button onClick={() => setOpen(false)} className="text-sm text-ink/50 hover:text-ink">Cancel</button>
+          : <PlusButton title="Add date entry" onClick={() => setOpen(true)} />)}
       </div>
 
       {open && (

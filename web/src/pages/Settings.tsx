@@ -92,6 +92,11 @@ export default function Settings() {
           )}
         </Section>
 
+        {/* Statuses */}
+        <Section title="Statuses" subtitle="Profile statuses (the first is the default for new profiles and the catalog filter).">
+          <ListEditor items={draft.statuses} onChange={(v) => set('statuses', v.length ? v : ['active'])} placeholder="Add a status…" />
+        </Section>
+
         {/* Body types */}
         <Section title="Body types" subtitle="The options offered when editing a profile's body type.">
           <ListEditor items={draft.body_types} onChange={(v) => set('body_types', v)} placeholder="Add a body type…" />

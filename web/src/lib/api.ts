@@ -55,6 +55,8 @@ export const api = {
   deleteProfile: (id: string) => req<{ ok: true }>(`/profiles/${id}`, { method: 'DELETE' }),
   setRating: (id: string, rating: number) =>
     req<{ rating: number }>(`/profiles/${id}/rating`, { method: 'PUT', body: JSON.stringify({ rating }) }),
+  rankProfiles: (order: string[]) =>
+    req<{ ok: true }>('/profiles/rank', { method: 'POST', body: JSON.stringify({ order }) }),
 
   addPhoto: (profileId: string, file: File) => {
     const fd = new FormData();

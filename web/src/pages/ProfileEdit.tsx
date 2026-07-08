@@ -13,11 +13,12 @@ interface FormState {
   cm: string;
   weight: string; // in the active display unit (lb or kg)
   body_type: string;
+  status: string;
   notes: string;
   extra: { key: string; value: string }[];
 }
 
-const empty: FormState = { name: '', birthday: '', ft: '', inch: '', cm: '', weight: '', body_type: '', notes: '', extra: [] };
+const empty: FormState = { name: '', birthday: '', ft: '', inch: '', cm: '', weight: '', body_type: '', status: 'active', notes: '', extra: [] };
 
 export default function ProfileEdit() {
   const { id } = useParams();
@@ -45,6 +46,7 @@ export default function ProfileEdit() {
         cm: profile.height_cm ? String(profile.height_cm) : '',
         weight,
         body_type: profile.body_type || '',
+        status: profile.status || 'active',
         notes: profile.notes || '',
         extra: Object.entries(profile.extra || {}).map(([key, value]) => ({ key, value: String(value) })),
       });
@@ -78,6 +80,7 @@ export default function ProfileEdit() {
       height_cm,
       weight_kg,
       body_type: form.body_type || null,
+      status: form.status || 'active',
       notes: form.notes || null,
       extra,
     };
@@ -139,6 +142,15 @@ export default function ProfileEdit() {
               <input type="number" min={0} placeholder={us ? 'lb' : 'kg'} className={input} value={form.weight} onChange={(e) => set('weight', e.target.value)} />
               <span className="text-ink/40">{us ? 'lb' : 'kg'}</span>
             </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className={label}>Status</label>
+            <select className={input} value={form.status} onChange={(e) => set('status', e.target.value)}>
+              {config.statuses.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            </select>
           </div>
         </div>
 

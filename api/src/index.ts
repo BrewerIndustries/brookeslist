@@ -96,6 +96,8 @@ function serializeProfile(row: any) {
     weight_kg: row.weight_kg ?? null,
     body_type: row.body_type,
     rating: row.rating,
+    status: row.status ?? 'active',
+    rank: row.rank ?? null,
     notes: row.notes,
     extra,
     created_at: row.created_at,
@@ -111,6 +113,7 @@ const DEFAULT_CONFIG = {
   stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
   rating_half_steps: true,
   gold_standard_id: null as string | null,
+  statuses: ['active', 'inactive'],
 };
 
 async function getConfig(c: any) {
@@ -183,6 +186,10 @@ app.put('/admin/settings', auth, requireAdmin, async (c) => {
   if (b.stat_presets !== undefined) next.stat_presets = cleanList(b.stat_presets);
   if (typeof b.rating_half_steps === 'boolean') next.rating_half_steps = b.rating_half_steps;
   if (b.gold_standard_id !== undefined) next.gold_standard_id = b.gold_standard_id ? String(b.gold_standard_id) : null;
+  if (b.statuses !== undefined) {
+    const s = cleanList(b.statuses);
+    if (s.length) next.statuses = s;
+  }
   await c.env.DB.prepare(
     "INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).bind(JSON.stringify(next)).run();
@@ -214,11 +221,12 @@ app.post('/profiles', auth, requireEditor, async (c) => {
   const ts = now();
   const birthday = b.birthday || null;
   await c.env.DB.prepare(
-    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, created_by, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, status, notes, extra, created_by, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id, String(b.name).trim(), birthday, zodiac(birthday),
     b.height_cm ?? null, b.weight_kg ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
+    b.status ? String(b.status) : 'active',
     b.notes ?? null, b.extra ? JSON.stringify(b.extra) : null,
     c.get('user').id, ts, ts,
   ).run();
@@ -256,15 +264,28 @@ app.patch('/profiles/:id', auth, requireEditor, async (c) => {
   const weight_kg = b.weight_kg !== undefined ? b.weight_kg : existing.weight_kg;
   const body_type = b.body_type !== undefined ? b.body_type : existing.body_type;
   const rating = b.rating !== undefined ? clampRating(b.rating) : existing.rating;
+  const status = b.status !== undefined ? String(b.status) : existing.status;
+  const rank = b.rank !== undefined ? (b.rank === null ? null : Number(b.rank)) : existing.rank;
   const notes = b.notes !== undefined ? b.notes : existing.notes;
   const extra = b.extra !== undefined ? (b.extra ? JSON.stringify(b.extra) : null) : existing.extra;
 
   await c.env.DB.prepare(
-    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
+    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, status=?, rank=?, notes=?, extra=?, updated_at=?
      WHERE id=?`,
-  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, now(), id).run();
+  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, status, rank, notes, extra, now(), id).run();
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   return c.json({ profile: serializeProfile(row) });
+});
+
+// Reorder profiles' manual rank: `order` = profile ids in desired order (rank = index).
+app.post('/profiles/rank', auth, requireEditor, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const order = Array.isArray(b.order) ? b.order.filter((x: any) => typeof x === 'string') : [];
+  if (!order.length) return c.json({ error: 'order required' }, 400);
+  await c.env.DB.batch(
+    order.map((pid: string, i: number) => c.env.DB.prepare('UPDATE profiles SET rank = ? WHERE id = ?').bind(i, pid)),
+  );
+  return c.json({ ok: true });
 });
 
 app.put('/profiles/:id/rating', auth, requireEditor, async (c) => {

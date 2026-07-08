@@ -22,12 +22,12 @@ export default function ProfileCard({ p }: { p: Card }) {
   return (
     <Link
       to={`/profile/${p.id}`}
-      className={`group flex aspect-square overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
+      className={`group flex overflow-hidden rounded-2xl bg-ink/5 ring-1 transition sm:aspect-square ${
         isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:ring-ink/20'
       }`}
     >
-      {/* Left: photo — the larger column (~60%), full card height */}
-      <div className="relative h-full basis-3/5 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20">
+      {/* Left: photo — balanced on mobile, the larger column (~60%) on larger screens */}
+      <div className="relative basis-1/2 shrink-0 self-stretch overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20 sm:basis-3/5">
         {p.photo_key ? (
           <img
             src={photoUrl(p.photo_key)}
