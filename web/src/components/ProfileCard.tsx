@@ -8,9 +8,9 @@ import StarRating from './StarRating';
 function Row({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null;
   return (
-    <div className="flex items-baseline justify-between gap-2">
-      <span className="shrink-0 text-xs text-ink/40">{label}</span>
-      <span className="truncate text-sm text-ink/80">{value}</span>
+    <div>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-ink/40">{label}</div>
+      <div className="break-words text-sm leading-snug text-ink/80">{value}</div>
     </div>
   );
 }
@@ -55,13 +55,13 @@ export default function ProfileCard({ p }: { p: Card }) {
           {isGold && <span className="text-amber-400">★</span>}
           <span className="truncate">{p.name}</span>
         </div>
-        <div className="space-y-0.5">
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
           <Row label="Sign" value={p.sign} />
           <Row label="Body" value={p.body_type} />
           <Row label="Height" value={formatHeight(p.height_cm, config.units)} />
           <Row label="Weight" value={formatWeight(p.weight_kg, config.units)} />
         </div>
-        <div className="mt-auto pt-1">
+        <div className="shrink-0 pt-1">
           <StarRating value={p.rating} size={15} showNumber={p.rating > 0} />
         </div>
       </div>
