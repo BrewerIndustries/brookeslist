@@ -44,6 +44,9 @@ def api(path, method="GET", body=None):
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(f"{API}{path}", data=data, method=method)
     req.add_header("Authorization", f"Bearer {TOKEN}")
+    # A real User-Agent — Cloudflare's edge 403s the default "Python-urllib/*".
+    req.add_header("User-Agent", "BrookeslistFeedbackPoller/1.0")
+    req.add_header("Accept", "application/json")
     if data:
         req.add_header("Content-Type", "application/json")
     with urllib.request.urlopen(req, timeout=20) as r:

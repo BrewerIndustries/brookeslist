@@ -126,16 +126,18 @@ Dan from Jarvis's own Gmail, then acks them.
   (`JARVIS_INGEST_TOKEN` Worker secret) — not a browser session.
 - Bridge script: `deploy/jarvis-feedback-poller.py` (pure stdlib, no deps).
 
-**Setup on the Jarvis server** (`dan@100.102.159.57`):
-1. Copy `deploy/feedback-poller.env.example` → `feedback-poller.env` (chmod 600), fill in:
-   the `JARVIS_INGEST_TOKEN` (matches the Worker secret), `SMTP_USER`/`SMTP_PASS`
-   (Jarvis's Gmail + app password), `NOTIFY_TO=myemailisdanmail@gmail.com`, and
-   `BROOKESLIST_API` (dev or prod).
-2. Test: `set -a && . feedback-poller.env && set +a && python3 jarvis-feedback-poller.py --dry-run`
-3. Cron (every 5 min):
-   ```
-   */5 * * * * set -a; . /opt/brookeslist/deploy/feedback-poller.env; set +a; /usr/bin/python3 /opt/brookeslist/deploy/jarvis-feedback-poller.py >> /var/log/brookeslist-feedback.log 2>&1
-   ```
+**Live install** (already set up on `dan@100.102.159.57`):
+- Script: `/home/dan/brookeslist-feedback/jarvis-feedback-poller.py`
+- Env (chmod 600): `/home/dan/brookeslist-feedback/feedback-poller.env` — SMTP creds are
+  read from Jarvis's own `config.yaml` (`serveremail.jarvis@gmail.com`); `BROOKESLIST_API`
+  points at the **dev** API; `NOTIFY_TO=myemailisdanmail@gmail.com`.
+- Cron (every 5 min): `crontab -l | grep feedback`; log at `~/brookeslist-feedback/poller.log`.
+
+Notes:
+- The poller sends a real `User-Agent` — Cloudflare's edge 403s the default `Python-urllib/*`.
+- **On prod promotion:** set a prod `JARVIS_INGEST_TOKEN` Worker secret, then update the env
+  file's `JARVIS_INGEST_TOKEN` + `BROOKESLIST_API=https://brookeslist-api.dabrewer.dev`.
+- To reinstall from scratch, `deploy/feedback-poller.env.example` documents every key.
 
 ## Roles
 | | viewer | editor | admin |
