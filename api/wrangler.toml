@@ -1,0 +1,35 @@
+# Brookeslist API — Cloudflare Worker (prod = default env, dev = [env.dev]).
+# Fill the two PLACEHOLDER database ids after `wrangler d1 create` (see README).
+
+name = "brookeslist-api"
+main = "src/index.ts"
+compatibility_date = "2024-11-06"
+
+# ---------------- PROD (default) ----------------
+[vars]
+ALLOWED_ORIGIN = "https://brookeslist.dabrewer.dev"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "brookeslist-prod"
+database_id = "PLACEHOLDER_PROD_D1_ID"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "brookeslist-photos-prod"
+
+# ---------------- DEV ----------------
+[env.dev]
+name = "brookeslist-api-dev"
+
+[env.dev.vars]
+ALLOWED_ORIGIN = "https://brookeslist.dabrewer.dev"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "brookeslist-dev"
+database_id = "PLACEHOLDER_DEV_D1_ID"
+
+[[env.dev.r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "brookeslist-photos-dev"

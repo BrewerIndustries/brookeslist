@@ -1,0 +1,378 @@
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+import { getCookie, setCookie, deleteCookie } from 'hono/cookie';
+import { hashPassword, verifyPassword, newToken, sessionId } from './auth';
+import { uuid, now, zodiac, clampRating } from './util';
+
+type Bindings = {
+  DB: D1Database;
+  PHOTOS: R2Bucket;
+  ALLOWED_ORIGIN: string;
+  SESSION_SECRET: string;
+};
+
+type SessionUser = {
+  id: string;
+  email: string;
+  role: 'viewer' | 'editor' | 'admin';
+  display_name: string | null;
+};
+
+const app = new Hono<{ Bindings: Bindings; Variables: { user: SessionUser } }>();
+
+const SESSION_DAYS = 30;
+const SESSION_MS = SESSION_DAYS * 24 * 60 * 60 * 1000;
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+
+// ---------------- CORS ----------------
+app.use('*', cors({
+  origin: (origin, c) => {
+    const allowed = [c.env.ALLOWED_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173'];
+    return allowed.includes(origin) ? origin : allowed[0];
+  },
+  credentials: true,
+  allowMethods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type'],
+}));
+
+// ---------------- helpers ----------------
+function publicUser(row: any): SessionUser {
+  return { id: row.id, email: row.email, role: row.role, display_name: row.display_name ?? null };
+}
+
+async function currentUser(c: any): Promise<SessionUser | null> {
+  const token = getCookie(c, 'bl_session');
+  if (!token) return null;
+  const id = await sessionId(token, c.env.SESSION_SECRET);
+  const row = await c.env.DB.prepare(
+    `SELECT u.id, u.email, u.role, u.display_name, s.expires_at
+     FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
+  ).bind(id).first();
+  if (!row) return null;
+  if (Number(row.expires_at) < Date.now()) return null;
+  return publicUser(row);
+}
+
+const auth = async (c: any, next: any) => {
+  const user = await currentUser(c);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  c.set('user', user);
+  await next();
+};
+
+const requireEditor = async (c: any, next: any) => {
+  const role = c.get('user').role;
+  if (role !== 'editor' && role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  await next();
+};
+
+const requireAdmin = async (c: any, next: any) => {
+  if (c.get('user').role !== 'admin') return c.json({ error: 'forbidden' }, 403);
+  await next();
+};
+
+function serializeProfile(row: any) {
+  let extra: any = {};
+  if (row.extra) { try { extra = JSON.parse(row.extra); } catch { extra = {}; } }
+  return {
+    id: row.id,
+    name: row.name,
+    birthday: row.birthday,
+    sign: row.sign,
+    height_cm: row.height_cm,
+    body_type: row.body_type,
+    rating: row.rating,
+    notes: row.notes,
+    extra,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// ---------------- health ----------------
+app.get('/', (c) => c.json({ ok: true, service: 'brookeslist-api' }));
+
+// ---------------- auth ----------------
+app.post('/auth/login', async (c) => {
+  const body = await c.req.json().catch(() => ({} as any));
+  const email = String(body.email ?? '').trim().toLowerCase();
+  const password = String(body.password ?? '');
+  if (!email || !password) return c.json({ error: 'email and password required' }, 400);
+
+  const user = await c.env.DB.prepare('SELECT * FROM users WHERE email = ?').bind(email).first();
+  if (!user || !(await verifyPassword(password, user.password_hash as string))) {
+    return c.json({ error: 'invalid credentials' }, 401);
+  }
+
+  const token = newToken();
+  const id = await sessionId(token, c.env.SESSION_SECRET);
+  const created = Date.now();
+  await c.env.DB.prepare('INSERT INTO sessions (id, user_id, created_at, expires_at) VALUES (?,?,?,?)')
+    .bind(id, user.id, created, created + SESSION_MS).run();
+
+  const host = new URL(c.req.url).hostname;
+  const secure = host !== 'localhost' && host !== '127.0.0.1';
+  setCookie(c, 'bl_session', token, {
+    httpOnly: true, secure, sameSite: 'Lax', path: '/', maxAge: SESSION_DAYS * 24 * 60 * 60,
+  });
+  return c.json({ user: publicUser(user) });
+});
+
+app.post('/auth/logout', auth, async (c) => {
+  const token = getCookie(c, 'bl_session');
+  if (token) {
+    await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?')
+      .bind(await sessionId(token, c.env.SESSION_SECRET)).run();
+  }
+  deleteCookie(c, 'bl_session', { path: '/' });
+  return c.json({ ok: true });
+});
+
+app.get('/auth/me', auth, (c) => c.json({ user: c.get('user') }));
+
+// ---------------- profiles ----------------
+app.get('/profiles', auth, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    `SELECT p.*,
+            (SELECT r2_key FROM profile_photos pp WHERE pp.profile_id = p.id
+             ORDER BY sort_order, created_at LIMIT 1) AS primary_key
+     FROM profiles p ORDER BY p.updated_at DESC`,
+  ).all();
+  const cards = (results as any[]).map((r) => ({
+    ...serializeProfile(r),
+    photo_key: r.primary_key ?? null,
+  }));
+  return c.json({ profiles: cards });
+});
+
+app.post('/profiles', auth, requireEditor, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  if (!b.name || !String(b.name).trim()) return c.json({ error: 'name is required' }, 400);
+  const id = uuid();
+  const ts = now();
+  const birthday = b.birthday || null;
+  await c.env.DB.prepare(
+    `INSERT INTO profiles (id, name, birthday, sign, height_cm, body_type, rating, notes, extra, created_by, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+  ).bind(
+    id, String(b.name).trim(), birthday, zodiac(birthday),
+    b.height_cm ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
+    b.notes ?? null, b.extra ? JSON.stringify(b.extra) : null,
+    c.get('user').id, ts, ts,
+  ).run();
+  const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
+  return c.json({ profile: serializeProfile(row) }, 201);
+});
+
+app.get('/profiles/:id', auth, async (c) => {
+  const id = c.req.param('id');
+  const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
+  if (!row) return c.json({ error: 'not found' }, 404);
+  const photos = await c.env.DB.prepare(
+    'SELECT id, r2_key, content_type, sort_order, created_at FROM profile_photos WHERE profile_id = ? ORDER BY sort_order, created_at',
+  ).bind(id).all();
+  const dates = await c.env.DB.prepare(
+    'SELECT * FROM date_logs WHERE profile_id = ? ORDER BY occurred_on DESC, created_at DESC',
+  ).bind(id).all();
+  return c.json({
+    profile: serializeProfile(row),
+    photos: photos.results,
+    dates: dates.results,
+  });
+});
+
+app.patch('/profiles/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const existing = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
+  if (!existing) return c.json({ error: 'not found' }, 404);
+  const b = await c.req.json().catch(() => ({} as any));
+
+  const name = b.name !== undefined ? String(b.name).trim() : existing.name;
+  const birthday = b.birthday !== undefined ? (b.birthday || null) : existing.birthday;
+  const sign = b.birthday !== undefined ? zodiac(birthday as string) : existing.sign;
+  const height_cm = b.height_cm !== undefined ? b.height_cm : existing.height_cm;
+  const body_type = b.body_type !== undefined ? b.body_type : existing.body_type;
+  const rating = b.rating !== undefined ? clampRating(b.rating) : existing.rating;
+  const notes = b.notes !== undefined ? b.notes : existing.notes;
+  const extra = b.extra !== undefined ? (b.extra ? JSON.stringify(b.extra) : null) : existing.extra;
+
+  await c.env.DB.prepare(
+    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
+     WHERE id=?`,
+  ).bind(name, birthday, sign, height_cm, body_type, rating, notes, extra, now(), id).run();
+  const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
+  return c.json({ profile: serializeProfile(row) });
+});
+
+app.put('/profiles/:id/rating', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const b = await c.req.json().catch(() => ({} as any));
+  const rating = clampRating(b.rating);
+  const res = await c.env.DB.prepare('UPDATE profiles SET rating=?, updated_at=? WHERE id=?')
+    .bind(rating, now(), id).run();
+  if (!res.meta.changes) return c.json({ error: 'not found' }, 404);
+  return c.json({ rating });
+});
+
+app.delete('/profiles/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const photos = await c.env.DB.prepare('SELECT r2_key FROM profile_photos WHERE profile_id = ?').bind(id).all();
+  for (const p of photos.results as any[]) {
+    await c.env.PHOTOS.delete(p.r2_key);
+  }
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM profile_photos WHERE profile_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM date_logs WHERE profile_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM profiles WHERE id = ?').bind(id),
+  ]);
+  return c.json({ ok: true });
+});
+
+// ---------------- photos ----------------
+app.post('/profiles/:id/photos', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const exists = await c.env.DB.prepare('SELECT id FROM profiles WHERE id = ?').bind(profileId).first();
+  if (!exists) return c.json({ error: 'not found' }, 404);
+
+  const form = await c.req.formData();
+  const file = form.get('file');
+  if (!file || typeof file === 'string') return c.json({ error: 'file field required' }, 400);
+  if (file.size > MAX_PHOTO_BYTES) return c.json({ error: 'file too large (max 10MB)' }, 413);
+
+  const ext = (file.name?.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const key = `${profileId}/${uuid()}.${ext}`;
+  await c.env.PHOTOS.put(key, await file.arrayBuffer(), {
+    httpMetadata: { contentType: file.type || 'application/octet-stream' },
+  });
+
+  const id = uuid();
+  const ts = now();
+  const order = form.get('sort_order') ? Number(form.get('sort_order')) : ts;
+  await c.env.DB.prepare(
+    'INSERT INTO profile_photos (id, profile_id, r2_key, content_type, sort_order, created_at) VALUES (?,?,?,?,?,?)',
+  ).bind(id, profileId, key, file.type || null, order, ts).run();
+  await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
+  return c.json({ photo: { id, r2_key: key, content_type: file.type, sort_order: order, created_at: ts } }, 201);
+});
+
+app.delete('/photos/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const row = await c.env.DB.prepare('SELECT r2_key FROM profile_photos WHERE id = ?').bind(id).first();
+  if (!row) return c.json({ error: 'not found' }, 404);
+  await c.env.PHOTOS.delete(row.r2_key as string);
+  await c.env.DB.prepare('DELETE FROM profile_photos WHERE id = ?').bind(id).run();
+  return c.json({ ok: true });
+});
+
+// Streams an image from R2 — auth-gated, so photos never load without a session.
+app.get('/photos/:key{.+}', auth, async (c) => {
+  const key = c.req.param('key');
+  const obj = await c.env.PHOTOS.get(key);
+  if (!obj) return c.json({ error: 'not found' }, 404);
+  const headers = new Headers();
+  obj.writeHttpMetadata(headers);
+  headers.set('Cache-Control', 'private, max-age=3600');
+  headers.set('etag', obj.httpEtag);
+  return new Response(obj.body, { headers });
+});
+
+// ---------------- date logs ----------------
+app.post('/profiles/:id/dates', auth, requireEditor, async (c) => {
+  const profileId = c.req.param('id');
+  const exists = await c.env.DB.prepare('SELECT id FROM profiles WHERE id = ?').bind(profileId).first();
+  if (!exists) return c.json({ error: 'not found' }, 404);
+  const b = await c.req.json().catch(() => ({} as any));
+  const id = uuid();
+  const ts = now();
+  await c.env.DB.prepare(
+    'INSERT INTO date_logs (id, profile_id, occurred_on, title, location, notes, created_by, created_at) VALUES (?,?,?,?,?,?,?,?)',
+  ).bind(id, profileId, b.occurred_on || null, b.title || null, b.location || null, b.notes || null, c.get('user').id, ts).run();
+  await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
+  const row = await c.env.DB.prepare('SELECT * FROM date_logs WHERE id = ?').bind(id).first();
+  return c.json({ date: row }, 201);
+});
+
+app.patch('/dates/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const existing = await c.env.DB.prepare('SELECT * FROM date_logs WHERE id = ?').bind(id).first();
+  if (!existing) return c.json({ error: 'not found' }, 404);
+  const b = await c.req.json().catch(() => ({} as any));
+  await c.env.DB.prepare(
+    'UPDATE date_logs SET occurred_on=?, title=?, location=?, notes=? WHERE id=?',
+  ).bind(
+    b.occurred_on !== undefined ? (b.occurred_on || null) : existing.occurred_on,
+    b.title !== undefined ? (b.title || null) : existing.title,
+    b.location !== undefined ? (b.location || null) : existing.location,
+    b.notes !== undefined ? (b.notes || null) : existing.notes,
+    id,
+  ).run();
+  const row = await c.env.DB.prepare('SELECT * FROM date_logs WHERE id = ?').bind(id).first();
+  return c.json({ date: row });
+});
+
+app.delete('/dates/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const res = await c.env.DB.prepare('DELETE FROM date_logs WHERE id = ?').bind(id).run();
+  if (!res.meta.changes) return c.json({ error: 'not found' }, 404);
+  return c.json({ ok: true });
+});
+
+// ---------------- admin: users ----------------
+app.get('/admin/users', auth, requireAdmin, async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT id, email, role, display_name, created_at FROM users ORDER BY created_at',
+  ).all();
+  return c.json({ users: results });
+});
+
+app.post('/admin/users', auth, requireAdmin, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const email = String(b.email ?? '').trim().toLowerCase();
+  const password = String(b.password ?? '');
+  const role = ['viewer', 'editor', 'admin'].includes(b.role) ? b.role : 'viewer';
+  if (!email || password.length < 8) return c.json({ error: 'email and password (min 8 chars) required' }, 400);
+  const dupe = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+  if (dupe) return c.json({ error: 'email already exists' }, 409);
+  const id = uuid();
+  await c.env.DB.prepare(
+    'INSERT INTO users (id, email, password_hash, role, display_name, created_at) VALUES (?,?,?,?,?,?)',
+  ).bind(id, email, await hashPassword(password), role, b.display_name || null, now()).run();
+  return c.json({ user: { id, email, role, display_name: b.display_name || null } }, 201);
+});
+
+app.patch('/admin/users/:id', auth, requireAdmin, async (c) => {
+  const id = c.req.param('id');
+  const existing = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(id).first();
+  if (!existing) return c.json({ error: 'not found' }, 404);
+  const b = await c.req.json().catch(() => ({} as any));
+
+  if (b.role !== undefined) {
+    if (!['viewer', 'editor', 'admin'].includes(b.role)) return c.json({ error: 'bad role' }, 400);
+    // don't let an admin demote themselves and lock everyone out
+    if (id === c.get('user').id && b.role !== 'admin') return c.json({ error: 'cannot change your own role' }, 400);
+    await c.env.DB.prepare('UPDATE users SET role=? WHERE id=?').bind(b.role, id).run();
+  }
+  if (b.display_name !== undefined) {
+    await c.env.DB.prepare('UPDATE users SET display_name=? WHERE id=?').bind(b.display_name || null, id).run();
+  }
+  if (b.password !== undefined) {
+    if (String(b.password).length < 8) return c.json({ error: 'password too short' }, 400);
+    await c.env.DB.prepare('UPDATE users SET password_hash=? WHERE id=?').bind(await hashPassword(String(b.password)), id).run();
+    // invalidate existing sessions on password change
+    await c.env.DB.prepare('DELETE FROM sessions WHERE user_id=?').bind(id).run();
+  }
+  const row = await c.env.DB.prepare('SELECT id, email, role, display_name, created_at FROM users WHERE id = ?').bind(id).first();
+  return c.json({ user: row });
+});
+
+app.delete('/admin/users/:id', auth, requireAdmin, async (c) => {
+  const id = c.req.param('id');
+  if (id === c.get('user').id) return c.json({ error: 'cannot delete yourself' }, 400);
+  await c.env.DB.batch([
+    c.env.DB.prepare('DELETE FROM sessions WHERE user_id = ?').bind(id),
+    c.env.DB.prepare('DELETE FROM users WHERE id = ?').bind(id),
+  ]);
+  return c.json({ ok: true });
+});
+
+export default app;

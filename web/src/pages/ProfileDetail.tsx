@@ -1,0 +1,215 @@
+import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { api, photoUrl } from '../lib/api';
+import type { DateLog, Photo, ProfileDetail as Detail } from '../lib/types';
+import { useCanEdit } from '../auth/AuthContext';
+import { cmToFtIn, formatDate } from '../lib/format';
+import StarRating from '../components/StarRating';
+
+export default function ProfileDetail() {
+  const { id = '' } = useParams();
+  const canEdit = useCanEdit();
+  const navigate = useNavigate();
+  const [data, setData] = useState<Detail | null>(null);
+  const [error, setError] = useState('');
+  const [active, setActive] = useState(0);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const load = () => api.getProfile(id).then(setData).catch((e) => setError(e.message));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
+
+  if (error) return <div className="rounded-xl bg-rose-500/15 p-4 text-rose-200">{error}</div>;
+  if (!data) return <div className="py-20 text-center text-white/40">Loading…</div>;
+
+  const { profile, photos, dates } = data;
+
+  async function setRating(v: number) {
+    await api.setRating(id, v);
+    setData((d) => (d ? { ...d, profile: { ...d.profile, rating: v } } : d));
+  }
+
+  async function upload(e: FormEvent) {
+    e.preventDefault();
+    const file = fileRef.current?.files?.[0];
+    if (!file) return;
+    try {
+      await api.addPhoto(id, file);
+      if (fileRef.current) fileRef.current.value = '';
+      await load();
+    } catch (err: any) { setError(err.message); }
+  }
+
+  async function removePhoto(photo: Photo) {
+    if (!confirm('Delete this photo?')) return;
+    await api.deletePhoto(photo.id);
+    setActive(0);
+    await load();
+  }
+
+  async function removeProfile() {
+    if (!confirm(`Delete ${profile.name}? This cannot be undone.`)) return;
+    await api.deleteProfile(id);
+    navigate('/');
+  }
+
+  const extraEntries = Object.entries(profile.extra || {});
+
+  return (
+    <div>
+      <Link to="/" className="mb-4 inline-block text-sm text-white/50 hover:text-white">← Catalog</Link>
+
+      <div className="grid gap-6 md:grid-cols-[minmax(0,340px)_1fr]">
+        {/* ---- Left: photos ---- */}
+        <div>
+          <div className="aspect-[4/5] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/20 to-rose-500/20 ring-1 ring-white/10">
+            {photos[active] ? (
+              <img src={photoUrl(photos[active].r2_key)} alt={profile.name} className="h-full w-full object-cover" />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-7xl font-black text-white/25">
+                {profile.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+          </div>
+          {photos.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {photos.map((ph, i) => (
+                <div key={ph.id} className="relative">
+                  <button
+                    onClick={() => setActive(i)}
+                    className={`h-16 w-14 overflow-hidden rounded-lg ring-2 ${i === active ? 'ring-rose-400' : 'ring-transparent'}`}
+                  >
+                    <img src={photoUrl(ph.r2_key)} alt="" className="h-full w-full object-cover" />
+                  </button>
+                  {canEdit && (
+                    <button
+                      onClick={() => removePhoto(ph)}
+                      className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full bg-black/80 text-xs text-white/80 ring-1 ring-white/20 hover:text-rose-300"
+                      title="Delete photo"
+                    >×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {canEdit && (
+            <form onSubmit={upload} className="mt-3 flex items-center gap-2">
+              <input ref={fileRef} type="file" accept="image/*" className="block w-full text-xs text-white/50 file:mr-2 file:rounded-md file:border-0 file:bg-white/10 file:px-2 file:py-1 file:text-white/80" />
+              <button type="submit" className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">Upload</button>
+            </form>
+          )}
+        </div>
+
+        {/* ---- Right: details ---- */}
+        <div>
+          <div className="flex flex-wrap items-start gap-3">
+            <h1 className="mr-auto text-3xl font-bold">{profile.name}</h1>
+            {canEdit && (
+              <div className="flex gap-2">
+                <Link to={`/profile/${id}/edit`} className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/20">Edit</Link>
+                <button onClick={removeProfile} className="rounded-lg px-3 py-1.5 text-sm text-rose-300 hover:bg-rose-500/15">Delete</button>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-3">
+            <StarRating value={profile.rating} size={28} onChange={canEdit ? setRating : undefined} />
+          </div>
+
+          <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+            <Stat label="Birthday" value={formatDate(profile.birthday)} />
+            <Stat label="Sign" value={profile.sign} />
+            <Stat label="Height" value={cmToFtIn(profile.height_cm)} />
+            <Stat label="Body type" value={profile.body_type} />
+            {extraEntries.map(([k, v]) => <Stat key={k} label={k} value={v} />)}
+          </dl>
+
+          {profile.notes && (
+            <div className="mt-6">
+              <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-white/40">Notes</h2>
+              <p className="whitespace-pre-wrap text-sm text-white/80">{profile.notes}</p>
+            </div>
+          )}
+
+          <DateLogSection profileId={id} dates={dates} canEdit={canEdit} onChange={load} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value?: string | null }) {
+  if (!value) return null;
+  return (
+    <div>
+      <dt className="text-xs uppercase tracking-wide text-white/40">{label}</dt>
+      <dd className="mt-0.5 text-white/90">{value}</dd>
+    </div>
+  );
+}
+
+function DateLogSection({ profileId, dates, canEdit, onChange }: { profileId: string; dates: DateLog[]; canEdit: boolean; onChange: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState({ occurred_on: '', title: '', location: '', notes: '' });
+
+  async function add(e: FormEvent) {
+    e.preventDefault();
+    await api.addDate(profileId, form);
+    setForm({ occurred_on: '', title: '', location: '', notes: '' });
+    setOpen(false);
+    await onChange();
+  }
+
+  async function del(d: DateLog) {
+    if (!confirm('Delete this entry?')) return;
+    await api.deleteDate(d.id);
+    await onChange();
+  }
+
+  return (
+    <div className="mt-8">
+      <div className="mb-2 flex items-center gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-white/40">Date log</h2>
+        {canEdit && (
+          <button onClick={() => setOpen((o) => !o)} className="text-sm text-rose-300 hover:text-rose-200">
+            {open ? 'Cancel' : '+ Add entry'}
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <form onSubmit={add} className="mb-4 space-y-2 rounded-xl bg-white/5 p-4 ring-1 ring-white/10">
+          <div className="flex flex-wrap gap-2">
+            <input type="date" value={form.occurred_on} onChange={(e) => setForm({ ...form, occurred_on: e.target.value })}
+              className="rounded-lg bg-black/30 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none" />
+            <input placeholder="Title (e.g. Dinner at Nobu)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })}
+              className="min-w-40 flex-1 rounded-lg bg-black/30 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none" />
+            <input placeholder="Location" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="rounded-lg bg-black/30 px-3 py-1.5 text-sm ring-1 ring-white/10 outline-none" />
+          </div>
+          <textarea placeholder="Notes…" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            className="w-full rounded-lg bg-black/30 px-3 py-2 text-sm ring-1 ring-white/10 outline-none" rows={3} />
+          <button type="submit" className="rounded-lg bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-400">Save entry</button>
+        </form>
+      )}
+
+      {dates.length === 0 ? (
+        <p className="text-sm text-white/30">No dates logged yet.</p>
+      ) : (
+        <ol className="space-y-3 border-l border-white/10 pl-4">
+          {dates.map((d) => (
+            <li key={d.id} className="relative">
+              <span className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-rose-400" />
+              <div className="flex items-baseline gap-2">
+                <span className="text-sm font-medium text-white/90">{d.title || 'Date'}</span>
+                {d.occurred_on && <span className="text-xs text-white/40">{formatDate(d.occurred_on)}</span>}
+                {d.location && <span className="text-xs text-white/40">· {d.location}</span>}
+                {canEdit && <button onClick={() => del(d)} className="ml-auto text-xs text-white/30 hover:text-rose-300">delete</button>}
+              </div>
+              {d.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-white/60">{d.notes}</p>}
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
