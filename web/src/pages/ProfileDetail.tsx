@@ -17,7 +17,12 @@ export default function ProfileDetail() {
   const [active, setActive] = useState(0);
   const [urlInput, setUrlInput] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [repositioning, setRepositioning] = useState(false);
+  const [focal, setFocal] = useState({ x: 50, y: 50 });
+  const [savingFocal, setSavingFocal] = useState(false);
+  const [bgBusy, setBgBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
 
   const load = () => api.getProfile(id).then(setData).catch((e) => setError(e.message));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [id]);
@@ -73,7 +78,57 @@ export default function ProfileDetail() {
     navigate('/');
   }
 
+  function startReposition() {
+    const ph = photos[active];
+    setFocal({ x: ph.focal_x, y: ph.focal_y });
+    setRepositioning(true);
+  }
+  function onDragStart(e: React.PointerEvent) {
+    if (!repositioning) return;
+    dragRef.current = { x: e.clientX, y: e.clientY };
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  }
+  function onDragMove(e: React.PointerEvent) {
+    if (!repositioning || !dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    const dy = e.clientY - dragRef.current.y;
+    dragRef.current = { x: e.clientX, y: e.clientY };
+    const clamp = (n: number) => Math.max(0, Math.min(100, n));
+    // dragging the image reveals the opposite edge → move focal against the drag
+    setFocal((f) => ({ x: clamp(f.x - dx * 0.3), y: clamp(f.y - dy * 0.3) }));
+  }
+  async function saveFocal() {
+    setSavingFocal(true);
+    setError('');
+    try {
+      await api.updatePhotoFocal(photos[active].id, Math.round(focal.x), Math.round(focal.y));
+      await load();
+      setRepositioning(false);
+    } catch (err: any) { setError(err.message); }
+    finally { setSavingFocal(false); }
+  }
+  async function removeBg() {
+    setBgBusy(true);
+    setError('');
+    const addedIndex = photos.length; // new photo appends to the end
+    try {
+      const { removeBackground } = await import('@imgly/background-removal');
+      const srcBlob = await (await fetch(photoUrl(photos[active].r2_key), { credentials: 'include' })).blob();
+      const outBlob = await removeBackground(srcBlob);
+      const file = new File([outBlob], `nobg-${Date.now()}.png`, { type: 'image/png' });
+      await api.addPhoto(id, file);
+      await load();
+      setActive(addedIndex);
+    } catch (err: any) {
+      setError('Background removal failed: ' + (err?.message || err));
+    } finally { setBgBusy(false); }
+  }
+
   const extraEntries = Object.entries(profile.extra || {});
+  const activePhoto = photos[active];
+  const objectPosition = activePhoto
+    ? (repositioning ? `${focal.x}% ${focal.y}%` : `${activePhoto.focal_x}% ${activePhoto.focal_y}%`)
+    : undefined;
 
   return (
     <div>
@@ -83,14 +138,28 @@ export default function ProfileDetail() {
         {/* ---- Left: photos ---- */}
         <div>
           <div className={`relative aspect-[4/5] w-full overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500/20 to-rose-500/20 ring-1 ${isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10'}`}>
-            {photos[active] ? (
-              <img src={photoUrl(photos[active].r2_key)} alt={profile.name} className="h-full w-full object-cover" />
+            {activePhoto ? (
+              <img
+                src={photoUrl(activePhoto.r2_key)}
+                alt={profile.name}
+                draggable={false}
+                onPointerDown={onDragStart}
+                onPointerMove={onDragMove}
+                onPointerUp={() => (dragRef.current = null)}
+                className={`h-full w-full select-none object-cover ${repositioning ? 'cursor-move touch-none' : ''}`}
+                style={{ objectPosition }}
+              />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-7xl font-black text-ink/25">
                 {profile.name.charAt(0).toUpperCase()}
               </div>
             )}
-            {isGold && (
+            {repositioning && (
+              <div className="pointer-events-none absolute inset-x-0 top-0 bg-black/60 px-3 py-1.5 text-center text-xs text-white">
+                Drag the photo to reposition
+              </div>
+            )}
+            {isGold && !repositioning && (
               <div className="absolute right-3 top-3 grid h-10 w-10 place-items-center rounded-full bg-amber-400 text-black shadow-lg ring-2 ring-amber-200/60" title="Gold standard">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77 5.82 21l1.18-6.88-5-4.87 6.91-1.01L12 2z" />
@@ -98,6 +167,27 @@ export default function ProfileDetail() {
               </div>
             )}
           </div>
+
+          {canEdit && activePhoto && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {repositioning ? (
+                <>
+                  <button onClick={saveFocal} disabled={savingFocal} className="rounded-lg bg-rose-500 px-3 py-1.5 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">
+                    {savingFocal ? 'Saving…' : 'Save position'}
+                  </button>
+                  <button onClick={() => setRepositioning(false)} className="rounded-lg px-3 py-1.5 text-sm text-ink/60 hover:bg-ink/10">Cancel</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={startReposition} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20">Reposition</button>
+                  <button onClick={removeBg} disabled={bgBusy} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20 disabled:opacity-50">
+                    {bgBusy ? 'Removing…' : 'Remove background'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+          {bgBusy && <p className="mt-1 text-xs text-ink/40">Removing background — first run downloads a model, this can take a bit…</p>}
           {photos.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {photos.map((ph, i) => (
@@ -106,7 +196,7 @@ export default function ProfileDetail() {
                     onClick={() => setActive(i)}
                     className={`h-16 w-14 overflow-hidden rounded-lg ring-2 ${i === active ? 'ring-rose-400' : 'ring-transparent'}`}
                   >
-                    <img src={photoUrl(ph.r2_key)} alt="" className="h-full w-full object-cover" />
+                    <img src={photoUrl(ph.r2_key)} alt="" className="h-full w-full object-cover" style={{ objectPosition: `${ph.focal_x}% ${ph.focal_y}%` }} />
                   </button>
                   {canEdit && (
                     <button

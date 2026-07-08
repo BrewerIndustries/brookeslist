@@ -115,6 +115,17 @@ allows `localhost:5173` via CORS and omits the `Secure` cookie flag on localhost
 - **New schema change:** add `api/migrations/000N_*.sql`, then `npm run migrate:prod` / `:dev`.
 - **Promotion:** work on `dev`, verify at `/dev/`, promote to `main` via a PR you approve.
 
+## Photos
+
+Each profile has a photo gallery (upload a file **or** paste an image URL, which the
+Worker scrapes into R2). Editors can:
+- **Reposition** — drag a photo to set its focal point; stored per-photo as
+  `focal_x`/`focal_y` (object-position %) and applied on the card + detail + thumbnails.
+- **Remove background** — client-side via `@imgly/background-removal` (lazy-loaded; first
+  run downloads an ONNX model). The cut-out PNG is uploaded as a new photo (non-destructive).
+
+Catalog cards are horizontal: photo on the left, name/stats/rating on the right.
+
 ## Support / feedback → Jarvis → email
 
 The **Support** page (in the header, all users) posts to `POST /feedback`, which stores

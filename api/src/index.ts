@@ -191,13 +191,16 @@ app.put('/admin/settings', auth, requireAdmin, async (c) => {
 app.get('/profiles', auth, async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT p.*,
-            (SELECT r2_key FROM profile_photos pp WHERE pp.profile_id = p.id
-             ORDER BY sort_order, created_at LIMIT 1) AS primary_key
+            (SELECT r2_key  FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_key,
+            (SELECT focal_x FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_focal_x,
+            (SELECT focal_y FROM profile_photos pp WHERE pp.profile_id = p.id ORDER BY sort_order, created_at LIMIT 1) AS primary_focal_y
      FROM profiles p ORDER BY p.updated_at DESC`,
   ).all();
   const cards = (results as any[]).map((r) => ({
     ...serializeProfile(r),
     photo_key: r.primary_key ?? null,
+    photo_focal_x: r.primary_focal_x ?? 50,
+    photo_focal_y: r.primary_focal_y ?? 50,
   }));
   return c.json({ profiles: cards });
 });
@@ -226,7 +229,7 @@ app.get('/profiles/:id', auth, async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   if (!row) return c.json({ error: 'not found' }, 404);
   const photos = await c.env.DB.prepare(
-    'SELECT id, r2_key, content_type, sort_order, created_at FROM profile_photos WHERE profile_id = ? ORDER BY sort_order, created_at',
+    'SELECT id, r2_key, content_type, sort_order, focal_x, focal_y, created_at FROM profile_photos WHERE profile_id = ? ORDER BY sort_order, created_at',
   ).bind(id).all();
   const dates = await c.env.DB.prepare(
     'SELECT * FROM date_logs WHERE profile_id = ? ORDER BY occurred_on DESC, created_at DESC',
@@ -351,6 +354,19 @@ app.post('/profiles/:id/photos/url', auth, requireEditor, async (c) => {
   ).bind(id, profileId, key, ct, ts, ts).run();
   await c.env.DB.prepare('UPDATE profiles SET updated_at=? WHERE id=?').bind(ts, profileId).run();
   return c.json({ photo: { id, r2_key: key, content_type: ct, sort_order: ts, created_at: ts } }, 201);
+});
+
+// Update a photo's focal point (0–100 each axis) for repositioning in its frame.
+app.patch('/photos/:id', auth, requireEditor, async (c) => {
+  const id = c.req.param('id');
+  const b = await c.req.json().catch(() => ({} as any));
+  const clamp = (v: any) => Math.max(0, Math.min(100, Number(v)));
+  const fx = clamp(b.focal_x);
+  const fy = clamp(b.focal_y);
+  if (!isFinite(fx) || !isFinite(fy)) return c.json({ error: 'focal_x and focal_y required' }, 400);
+  const res = await c.env.DB.prepare('UPDATE profile_photos SET focal_x = ?, focal_y = ? WHERE id = ?').bind(fx, fy, id).run();
+  if (!res.meta.changes) return c.json({ error: 'not found' }, 404);
+  return c.json({ ok: true, focal_x: fx, focal_y: fy });
 });
 
 app.delete('/photos/:id', auth, requireEditor, async (c) => {

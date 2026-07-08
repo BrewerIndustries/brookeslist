@@ -42,6 +42,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 
 export interface ProfileCard extends Profile {
   photo_key: string | null;
+  photo_focal_x: number;
+  photo_focal_y: number;
 }
 
 export interface Photo {
@@ -49,6 +51,8 @@ export interface Photo {
   r2_key: string;
   content_type: string | null;
   sort_order: number;
+  focal_x: number;
+  focal_y: number;
   created_at: number;
 }
 

@@ -1,33 +1,16 @@
-import { useMemo, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api';
 
 const CATEGORIES = ['Bug', 'Idea / Feature', 'Question', 'Other'] as const;
 type Category = (typeof CATEGORIES)[number];
 
-const TEMPLATES: Record<Category, string> = {
-  'Bug': 'What happened:\n\nWhat I expected:\n\nSteps to reproduce:\n1. \n2. ',
-  'Idea / Feature': "What I'd like:\n\nWhy it would help:\n",
-  'Question': 'My question:\n',
-  'Other': '',
-};
-
 export default function Support() {
   const [category, setCategory] = useState<Category>('Bug');
   const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState(TEMPLATES['Bug']);
-  const [touched, setTouched] = useState(false);
+  const [message, setMessage] = useState('');
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [error, setError] = useState('');
-
-  // Swap the template when the category changes, unless the user has typed their own.
-  const placeholder = useMemo(() => TEMPLATES[category], [category]);
-  function pickCategory(c: Category) {
-    setCategory(c);
-    if (!touched || message.trim() === '' || Object.values(TEMPLATES).includes(message)) {
-      setMessage(TEMPLATES[c]);
-    }
-  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -55,7 +38,7 @@ export default function Support() {
         <div className="mt-6 flex justify-center gap-2">
           <Link to="/" className="rounded-lg bg-ink/10 px-4 py-2 text-sm hover:bg-ink/20">Back to catalog</Link>
           <button
-            onClick={() => { setStatus('idle'); setSubject(''); setMessage(TEMPLATES[category]); setTouched(false); }}
+            onClick={() => { setStatus('idle'); setSubject(''); setMessage(''); }}
             className="rounded-lg px-4 py-2 text-sm text-ink/60 hover:bg-ink/10"
           >Send another</button>
         </div>
@@ -76,7 +59,7 @@ export default function Support() {
               <button
                 key={c}
                 type="button"
-                onClick={() => pickCategory(c)}
+                onClick={() => setCategory(c)}
                 className={`rounded-lg px-3 py-1.5 text-sm ring-1 ${
                   category === c ? 'bg-rose-500 text-white ring-rose-400' : 'bg-ink/5 text-ink/70 ring-ink/10 hover:bg-ink/10'
                 }`}
@@ -93,10 +76,10 @@ export default function Support() {
         <div>
           <label className={label}>Message</label>
           <textarea
-            className={input + ' min-h-40 font-mono text-[13px] leading-relaxed'}
+            className={input + ' min-h-40'}
             value={message}
-            onChange={(e) => { setMessage(e.target.value); setTouched(true); }}
-            placeholder={placeholder}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="What's going on?"
             required
           />
         </div>
@@ -105,7 +88,7 @@ export default function Support() {
 
         <div className="flex gap-2">
           <button type="submit" disabled={status === 'sending' || !message.trim()} className="rounded-lg bg-rose-500 px-5 py-2 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-50">
-            {status === 'sending' ? 'Sending…' : 'Send to Jarvis'}
+            {status === 'sending' ? 'Sending…' : 'Send'}
           </button>
           <Link to="/" className="rounded-lg px-4 py-2 text-sm text-ink/60 hover:bg-ink/10">Cancel</Link>
         </div>

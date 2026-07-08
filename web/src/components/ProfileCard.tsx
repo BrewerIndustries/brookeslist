@@ -13,39 +13,41 @@ export default function ProfileCard({ p }: { p: Card }) {
   return (
     <Link
       to={`/profile/${p.id}`}
-      className={`group block overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
+      className={`group flex min-h-[8.5rem] overflow-hidden rounded-2xl bg-ink/5 ring-1 transition ${
         isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:ring-ink/20'
       }`}
     >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20">
+      {/* Left: photo */}
+      <div className="relative w-28 shrink-0 overflow-hidden bg-gradient-to-br from-violet-500/20 to-rose-500/20 sm:w-36">
         {p.photo_key ? (
           <img
             src={photoUrl(p.photo_key)}
             alt={p.name}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]"
+            style={{ objectPosition: `${p.photo_focal_x}% ${p.photo_focal_y}%` }}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-6xl font-black text-ink/25">
+          <div className="flex h-full w-full items-center justify-center text-5xl font-black text-ink/25">
             {p.name.charAt(0).toUpperCase()}
           </div>
         )}
         {isGold && (
-          <div className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-amber-400 text-black shadow-lg ring-2 ring-amber-200/60" title="Gold standard">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <div className="absolute left-2 top-2 grid h-7 w-7 place-items-center rounded-full bg-amber-400 text-black shadow-lg ring-2 ring-amber-200/60" title="Gold standard">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2l2.9 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77 5.82 21l1.18-6.88-5-4.87 6.91-1.01L12 2z" />
             </svg>
           </div>
         )}
       </div>
-      <div className={`p-3 ${isGold ? 'bg-amber-400/10' : ''}`}>
-        <div className="flex items-center gap-1 truncate text-base font-semibold text-ink">
+
+      {/* Right: data */}
+      <div className={`flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-4 ${isGold ? 'bg-amber-400/10' : ''}`}>
+        <div className="flex items-center gap-1.5 text-lg font-semibold text-ink">
           {isGold && <span className="text-amber-400">★</span>}
           <span className="truncate">{p.name}</span>
         </div>
-        {stats && <div className="mt-0.5 truncate text-xs text-ink/50">{stats}</div>}
-        <div className="mt-2">
-          <StarRating value={p.rating} size={16} showNumber={p.rating > 0} />
-        </div>
+        {stats && <div className="truncate text-sm text-ink/50">{stats}</div>}
+        <StarRating value={p.rating} size={18} showNumber={p.rating > 0} />
       </div>
     </Link>
   );
