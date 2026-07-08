@@ -115,11 +115,34 @@ allows `localhost:5173` via CORS and omits the `Secure` cookie flag on localhost
 - **New schema change:** add `api/migrations/000N_*.sql`, then `npm run migrate:prod` / `:dev`.
 - **Promotion:** work on `dev`, verify at `/dev/`, promote to `main` via a PR you approve.
 
+## Support / feedback → Jarvis → email
+
+The **Support** page (in the header, all users) posts to `POST /feedback`, which stores
+the submission in D1. Because the Cloudflare Worker can't reach the Tailscale-only Jarvis
+box, Jarvis **pulls**: a tiny cron poller on the server reads new items and emails them to
+Dan from Jarvis's own Gmail, then acks them.
+
+- `GET /feedback/pending` and `POST /feedback/ack` are protected by a bearer token
+  (`JARVIS_INGEST_TOKEN` Worker secret) — not a browser session.
+- Bridge script: `deploy/jarvis-feedback-poller.py` (pure stdlib, no deps).
+
+**Setup on the Jarvis server** (`dan@100.102.159.57`):
+1. Copy `deploy/feedback-poller.env.example` → `feedback-poller.env` (chmod 600), fill in:
+   the `JARVIS_INGEST_TOKEN` (matches the Worker secret), `SMTP_USER`/`SMTP_PASS`
+   (Jarvis's Gmail + app password), `NOTIFY_TO=myemailisdanmail@gmail.com`, and
+   `BROOKESLIST_API` (dev or prod).
+2. Test: `set -a && . feedback-poller.env && set +a && python3 jarvis-feedback-poller.py --dry-run`
+3. Cron (every 5 min):
+   ```
+   */5 * * * * set -a; . /opt/brookeslist/deploy/feedback-poller.env; set +a; /usr/bin/python3 /opt/brookeslist/deploy/jarvis-feedback-poller.py >> /var/log/brookeslist-feedback.log 2>&1
+   ```
+
 ## Roles
 | | viewer | editor | admin |
 |---|:--:|:--:|:--:|
 | View profiles/photos/dates | ✅ | ✅ | ✅ |
 | Create/edit/delete profiles, photos, dates, ratings | | ✅ | ✅ |
+| Submit support/feedback | ✅ | ✅ | ✅ |
 | Manage users (invite / set role / reset pw) | | | ✅ |
 | App configuration (Settings page) | | | ✅ |
 
