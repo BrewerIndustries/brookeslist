@@ -30,9 +30,14 @@ export default function Layout({ children }: { children: ReactNode }) {
           </Link>
         )}
         {user?.role === 'admin' && (
-          <Link to="/admin" className="rounded-lg px-3 py-1.5 text-sm text-white/70 hover:bg-white/10 hover:text-white">
-            Admin
-          </Link>
+          <>
+            <Link to="/admin" className="rounded-lg px-3 py-1.5 text-sm text-white/70 hover:bg-white/10 hover:text-white">
+              Admin
+            </Link>
+            <Link to="/settings" className="rounded-lg px-3 py-1.5 text-sm text-white/70 hover:bg-white/10 hover:text-white">
+              Settings
+            </Link>
+          </>
         )}
 
         <div className="flex items-center gap-2">

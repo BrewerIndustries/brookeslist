@@ -1,11 +1,13 @@
 import { Link } from 'react-router-dom';
 import type { ProfileCard as Card } from '../lib/types';
 import { photoUrl } from '../lib/api';
-import { cmToFtIn } from '../lib/format';
+import { formatHeight } from '../lib/format';
+import { useSettings } from '../settings/SettingsContext';
 import StarRating from './StarRating';
 
 export default function ProfileCard({ p }: { p: Card }) {
-  const stats = [p.sign, p.body_type, cmToFtIn(p.height_cm)].filter(Boolean).join(' · ');
+  const { config } = useSettings();
+  const stats = [p.sign, p.body_type, formatHeight(p.height_cm, config.units)].filter(Boolean).join(' · ');
   return (
     <Link
       to={`/profile/${p.id}`}

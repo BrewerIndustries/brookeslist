@@ -1,11 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
+import { SettingsProvider } from './settings/SettingsContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Catalog from './pages/Catalog';
 import ProfileDetail from './pages/ProfileDetail';
 import ProfileEdit from './pages/ProfileEdit';
 import Admin from './pages/Admin';
+import Settings from './pages/Settings';
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -22,15 +24,18 @@ export default function App() {
   if (!user) return <Login />;
 
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Catalog />} />
-        <Route path="/profile/new" element={<ProfileEdit />} />
-        <Route path="/profile/:id" element={<ProfileDetail />} />
-        <Route path="/profile/:id/edit" element={<ProfileEdit />} />
-        <Route path="/admin" element={<Admin />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Layout>
+    <SettingsProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Catalog />} />
+          <Route path="/profile/new" element={<ProfileEdit />} />
+          <Route path="/profile/:id" element={<ProfileDetail />} />
+          <Route path="/profile/:id/edit" element={<ProfileEdit />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Layout>
+    </SettingsProvider>
   );
 }

@@ -13,6 +13,7 @@ export interface Profile {
   birthday: string | null;
   sign: string | null;
   height_cm: number | null;
+  weight_kg: number | null;
   body_type: string | null;
   rating: number;
   notes: string | null;
@@ -20,6 +21,22 @@ export interface Profile {
   created_at: number;
   updated_at: number;
 }
+
+export type Units = 'us' | 'metric';
+
+export interface AppConfig {
+  units: Units;
+  body_types: string[];
+  stat_presets: string[];
+  rating_half_steps: boolean;
+}
+
+export const DEFAULT_CONFIG: AppConfig = {
+  units: 'us',
+  body_types: ['Slim', 'Athletic', 'Average', 'Curvy', 'Muscular', 'Plus-size', 'Petite', 'Tall'],
+  stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
+  rating_half_steps: true,
+};
 
 export interface ProfileCard extends Profile {
   photo_key: string | null;

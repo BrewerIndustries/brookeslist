@@ -3,13 +3,15 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, photoUrl } from '../lib/api';
 import type { DateLog, Photo, ProfileDetail as Detail } from '../lib/types';
 import { useCanEdit } from '../auth/AuthContext';
-import { cmToFtIn, formatDate } from '../lib/format';
+import { useSettings } from '../settings/SettingsContext';
+import { formatDate, formatHeight, formatWeight } from '../lib/format';
 import StarRating from '../components/StarRating';
 
 export default function ProfileDetail() {
   const { id = '' } = useParams();
   const canEdit = useCanEdit();
   const navigate = useNavigate();
+  const { config } = useSettings();
   const [data, setData] = useState<Detail | null>(null);
   const [error, setError] = useState('');
   const [active, setActive] = useState(0);
@@ -112,13 +114,14 @@ export default function ProfileDetail() {
           </div>
 
           <div className="mt-3">
-            <StarRating value={profile.rating} size={28} onChange={canEdit ? setRating : undefined} />
+            <StarRating value={profile.rating} size={28} half={config.rating_half_steps} onChange={canEdit ? setRating : undefined} />
           </div>
 
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <Stat label="Birthday" value={formatDate(profile.birthday)} />
             <Stat label="Sign" value={profile.sign} />
-            <Stat label="Height" value={cmToFtIn(profile.height_cm)} />
+            <Stat label="Height" value={formatHeight(profile.height_cm, config.units)} />
+            <Stat label="Weight" value={formatWeight(profile.weight_kg, config.units)} />
             <Stat label="Body type" value={profile.body_type} />
             {extraEntries.map(([k, v]) => <Stat key={k} label={k} value={v} />)}
           </dl>

@@ -13,9 +13,10 @@ interface Props {
   onChange?: (v: number) => void;
   size?: number;
   showNumber?: boolean;
+  half?: boolean;
 }
 
-export default function StarRating({ value, onChange, size = 22, showNumber = true }: Props) {
+export default function StarRating({ value, onChange, size = 22, showNumber = true, half = true }: Props) {
   const editable = !!onChange;
   const [hover, setHover] = useState<number | null>(null);
   const shown = hover ?? value;
@@ -37,10 +38,10 @@ export default function StarRating({ value, onChange, size = 22, showNumber = tr
                 <>
                   <button
                     type="button"
-                    aria-label={`${i - 0.5} stars`}
+                    aria-label={`${half ? i - 0.5 : i} stars`}
                     className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer"
-                    onMouseEnter={() => setHover(i - 0.5)}
-                    onClick={() => onChange!(i - 0.5)}
+                    onMouseEnter={() => setHover(half ? i - 0.5 : i)}
+                    onClick={() => onChange!(half ? i - 0.5 : i)}
                   />
                   <button
                     type="button"

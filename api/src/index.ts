@@ -80,6 +80,7 @@ function serializeProfile(row: any) {
     birthday: row.birthday,
     sign: row.sign,
     height_cm: row.height_cm,
+    weight_kg: row.weight_kg ?? null,
     body_type: row.body_type,
     rating: row.rating,
     notes: row.notes,
@@ -87,6 +88,33 @@ function serializeProfile(row: any) {
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
+}
+
+// App configuration (admin-editable). Defaults fill any keys missing from the
+// stored row so older configs stay forward-compatible.
+const DEFAULT_CONFIG = {
+  units: 'us' as 'us' | 'metric',
+  body_types: ['Slim', 'Athletic', 'Average', 'Curvy', 'Muscular', 'Plus-size', 'Petite', 'Tall'],
+  stat_presets: ['Eyes', 'Hair', 'How we met', 'Occupation', 'Location'],
+  rating_half_steps: true,
+};
+
+async function getConfig(c: any) {
+  const row = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'config'").first();
+  let stored: any = {};
+  if (row?.value) { try { stored = JSON.parse(row.value); } catch { stored = {}; } }
+  return { ...DEFAULT_CONFIG, ...stored };
+}
+
+function cleanList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const item of v) {
+    const s = String(item).trim();
+    if (s && !seen.has(s.toLowerCase())) { seen.add(s.toLowerCase()); out.push(s); }
+  }
+  return out;
 }
 
 // ---------------- health ----------------
@@ -130,6 +158,22 @@ app.post('/auth/logout', auth, async (c) => {
 
 app.get('/auth/me', auth, (c) => c.json({ user: c.get('user') }));
 
+// ---------------- settings (config) ----------------
+app.get('/settings', auth, async (c) => c.json({ config: await getConfig(c) }));
+
+app.put('/admin/settings', auth, requireAdmin, async (c) => {
+  const b = await c.req.json().catch(() => ({} as any));
+  const next = await getConfig(c);
+  if (b.units === 'us' || b.units === 'metric') next.units = b.units;
+  if (b.body_types !== undefined) next.body_types = cleanList(b.body_types);
+  if (b.stat_presets !== undefined) next.stat_presets = cleanList(b.stat_presets);
+  if (typeof b.rating_half_steps === 'boolean') next.rating_half_steps = b.rating_half_steps;
+  await c.env.DB.prepare(
+    "INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+  ).bind(JSON.stringify(next)).run();
+  return c.json({ config: next });
+});
+
 // ---------------- profiles ----------------
 app.get('/profiles', auth, async (c) => {
   const { results } = await c.env.DB.prepare(
@@ -152,11 +196,11 @@ app.post('/profiles', auth, requireEditor, async (c) => {
   const ts = now();
   const birthday = b.birthday || null;
   await c.env.DB.prepare(
-    `INSERT INTO profiles (id, name, birthday, sign, height_cm, body_type, rating, notes, extra, created_by, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, created_by, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id, String(b.name).trim(), birthday, zodiac(birthday),
-    b.height_cm ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
+    b.height_cm ?? null, b.weight_kg ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
     b.notes ?? null, b.extra ? JSON.stringify(b.extra) : null,
     c.get('user').id, ts, ts,
   ).run();
@@ -191,15 +235,16 @@ app.patch('/profiles/:id', auth, requireEditor, async (c) => {
   const birthday = b.birthday !== undefined ? (b.birthday || null) : existing.birthday;
   const sign = b.birthday !== undefined ? zodiac(birthday as string) : existing.sign;
   const height_cm = b.height_cm !== undefined ? b.height_cm : existing.height_cm;
+  const weight_kg = b.weight_kg !== undefined ? b.weight_kg : existing.weight_kg;
   const body_type = b.body_type !== undefined ? b.body_type : existing.body_type;
   const rating = b.rating !== undefined ? clampRating(b.rating) : existing.rating;
   const notes = b.notes !== undefined ? b.notes : existing.notes;
   const extra = b.extra !== undefined ? (b.extra ? JSON.stringify(b.extra) : null) : existing.extra;
 
   await c.env.DB.prepare(
-    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
+    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, notes=?, extra=?, updated_at=?
      WHERE id=?`,
-  ).bind(name, birthday, sign, height_cm, body_type, rating, notes, extra, now(), id).run();
+  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, notes, extra, now(), id).run();
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   return c.json({ profile: serializeProfile(row) });
 });

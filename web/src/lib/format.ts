@@ -21,6 +21,25 @@ export function cmToFt(cm: number): { ft: number; inch: number } {
   return { ft: feet, inch };
 }
 
+export function kgToLb(kg?: number | null): number | null {
+  if (kg == null) return null;
+  return Math.round(kg * 2.2046226218);
+}
+
+export function lbToKg(lb: number): number {
+  return Math.round((lb / 2.2046226218) * 10) / 10;
+}
+
+export function formatHeight(cm: number | null | undefined, units: 'us' | 'metric'): string | null {
+  if (!cm) return null;
+  return units === 'metric' ? `${cm} cm` : cmToFtIn(cm);
+}
+
+export function formatWeight(kg: number | null | undefined, units: 'us' | 'metric'): string | null {
+  if (kg == null) return null;
+  return units === 'metric' ? `${Math.round(kg)} kg` : `${kgToLb(kg)} lb`;
+}
+
 export function formatDate(iso?: string | null): string {
   if (!iso) return '';
   const d = new Date(iso + (iso.length === 10 ? 'T00:00:00' : ''));
