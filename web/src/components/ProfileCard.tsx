@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import type { ProfileCard as Card } from '../lib/types';
 import { photoUrl } from '../lib/api';
 import { formatHeight, formatWeight } from '../lib/format';
+import { zodiacSymbol } from '../lib/zodiac';
 import { useSettings } from '../settings/SettingsContext';
 import StarRating from './StarRating';
 
@@ -56,7 +57,7 @@ export default function ProfileCard({ p }: { p: Card }) {
           <span className="truncate">{p.name}</span>
         </div>
         <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-          <Row label="Sign" value={p.sign} />
+          <Row label="Sign" value={p.sign ? `${zodiacSymbol(p.sign) ?? ''} ${p.sign}`.trim() : null} />
           <Row label="Body" value={p.body_type} />
           <Row label="Height" value={formatHeight(p.height_cm, config.units)} />
           <Row label="Weight" value={formatWeight(p.weight_kg, config.units)} />

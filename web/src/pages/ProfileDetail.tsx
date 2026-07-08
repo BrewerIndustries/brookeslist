@@ -5,6 +5,7 @@ import type { DateLog, Photo, ProfileDetail as Detail } from '../lib/types';
 import { useCanEdit } from '../auth/AuthContext';
 import { useSettings } from '../settings/SettingsContext';
 import { formatDate, formatHeight, formatWeight } from '../lib/format';
+import { zodiacSymbol } from '../lib/zodiac';
 import StarRating from '../components/StarRating';
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
@@ -293,7 +294,7 @@ export default function ProfileDetail() {
             </div>
           )}
           <div className="flex flex-wrap items-start gap-3">
-            <h1 className="mr-auto text-3xl font-bold">{profile.name}</h1>
+            <h1 className="mr-auto bg-gradient-to-r from-rose-400 to-violet-500 bg-clip-text text-3xl font-bold text-transparent">{profile.name}</h1>
             {canEdit && (
               <div className="flex gap-2">
                 <Link to={`/profile/${id}/edit`} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20">Edit</Link>
@@ -316,7 +317,15 @@ export default function ProfileDetail() {
 
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <Stat label="Birthday" value={formatDate(profile.birthday)} />
-            <Stat label="Sign" value={profile.sign} />
+            {profile.sign && (
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-ink/40">Sign</dt>
+                <dd className="mt-0.5 flex flex-col items-start leading-none">
+                  <span className="text-3xl text-rose-300">{zodiacSymbol(profile.sign) ?? '★'}</span>
+                  <span className="mt-1 text-xs text-ink/70">{profile.sign}</span>
+                </dd>
+              </div>
+            )}
             <Stat label="Height" value={formatHeight(profile.height_cm, config.units)} />
             <Stat label="Weight" value={formatWeight(profile.weight_kg, config.units)} />
             <Stat label="Body type" value={profile.body_type} />
