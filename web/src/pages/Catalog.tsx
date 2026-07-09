@@ -75,10 +75,11 @@ export default function Catalog() {
 
       {shown.length === 0 ? (
         <div className="rounded-2xl bg-ink/5 p-12 text-center ring-1 ring-ink/10">
-          <p className="text-ink/50">No {filter === 'all' ? '' : filter} profiles{q ? ' match' : ' yet'}.</p>
+          <div className="mb-2 text-4xl">{q ? '🔍' : '💌'}</div>
+          <p className="text-ink/50">{q ? 'No cuties match that search.' : `No ${filter === 'all' ? '' : filter} cuties here yet 💅`}</p>
           {canEdit && !q && (
             <Link to="/profile/new" className="mt-3 inline-block rounded-lg bg-rose-500 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-400">
-              Create one
+              Add someone 💕
             </Link>
           )}
         </div>

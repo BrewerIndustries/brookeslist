@@ -5,8 +5,10 @@ import type { DateLog, Photo, ProfileDetail as Detail } from '../lib/types';
 import { useCanEdit } from '../auth/AuthContext';
 import { useSettings } from '../settings/SettingsContext';
 import { formatDate, formatHeight, formatWeight } from '../lib/format';
-import { zodiacSymbol } from '../lib/zodiac';
+import { zodiacSymbol, zodiacColor } from '../lib/zodiac';
+import { celebrate } from '../lib/confetti';
 import StarRating from '../components/StarRating';
+import TagChip from '../components/TagChip';
 
 const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
@@ -40,6 +42,7 @@ export default function ProfileDetail() {
   async function setRating(v: number) {
     await api.setRating(id, v);
     setData((d) => (d ? { ...d, profile: { ...d.profile, rating: v } } : d));
+    if (v >= 5) celebrate();
   }
 
   async function setStatus(v: string) {
@@ -315,13 +318,19 @@ export default function ProfileDetail() {
             )}
           </div>
 
+          {profile.tags?.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {profile.tags.map((t) => <TagChip key={t} tag={t} />)}
+            </div>
+          )}
+
           <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
             <Stat label="Birthday" value={formatDate(profile.birthday)} />
             {profile.sign && (
               <div>
                 <dt className="text-xs uppercase tracking-wide text-ink/40">Sign</dt>
                 <dd className="mt-0.5 flex flex-col items-start leading-none">
-                  <span className="text-3xl text-rose-300">{zodiacSymbol(profile.sign) ?? '★'}</span>
+                  <span className={`text-3xl ${zodiacColor(profile.sign)}`}>{zodiacSymbol(profile.sign) ?? '★'}</span>
                   <span className="mt-1 text-xs text-ink/70">{profile.sign}</span>
                 </dd>
               </div>

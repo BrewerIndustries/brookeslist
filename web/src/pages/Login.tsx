@@ -28,7 +28,7 @@ export default function Login() {
       <div className="absolute right-4 top-4"><ThemeToggle /></div>
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-black tracking-tight">
+          <h1 className="font-display text-4xl font-bold tracking-tight">
             <span className="text-brand-rose">Brooke's</span>
             <span className="text-brand-violet"> List</span>
           </h1>

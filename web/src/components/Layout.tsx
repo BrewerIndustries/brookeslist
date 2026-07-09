@@ -26,9 +26,9 @@ export default function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto max-w-6xl px-4 pb-16">
       <header className="flex items-center gap-2 py-4">
-        <Link to="/" onClick={close} className="mr-auto flex items-baseline">
-          <span className="text-xl font-black tracking-tight text-brand-rose sm:text-2xl">Brooke's</span>
-          <span className="text-xl font-black tracking-tight text-brand-violet sm:text-2xl">&nbsp;List</span>
+        <Link to="/" onClick={close} className="font-display mr-auto flex items-baseline">
+          <span className="text-xl font-bold tracking-tight text-brand-rose sm:text-2xl">Brooke's</span>
+          <span className="text-xl font-bold tracking-tight text-brand-violet sm:text-2xl">&nbsp;List</span>
         </Link>
 
         {/* Desktop nav */}

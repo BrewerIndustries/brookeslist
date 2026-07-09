@@ -18,6 +18,7 @@ export interface Profile {
   rating: number;
   status: string;
   rank: number | null;
+  tags: string[];
   notes: string | null;
   extra: Record<string, string>;
   created_at: number;
@@ -33,6 +34,7 @@ export interface AppConfig {
   rating_half_steps: boolean;
   gold_standard_id: string | null;
   statuses: string[];
+  rating_icon: 'heart' | 'star';
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -42,6 +44,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   rating_half_steps: true,
   gold_standard_id: null,
   statuses: ['active', 'inactive'],
+  rating_icon: 'heart',
 };
 
 export interface ProfileCard extends Profile {

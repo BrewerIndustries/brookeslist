@@ -1,12 +1,14 @@
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { ProfileCard as Card } from '../lib/types';
 import { photoUrl } from '../lib/api';
 import { formatHeight, formatWeight } from '../lib/format';
-import { zodiacSymbol } from '../lib/zodiac';
+import { zodiacSymbol, zodiacColor } from '../lib/zodiac';
 import { useSettings } from '../settings/SettingsContext';
 import StarRating from './StarRating';
+import TagChip from './TagChip';
 
-function Row({ label, value }: { label: string; value?: string | null }) {
+function Row({ label, value }: { label: string; value?: ReactNode }) {
   if (!value) return null;
   return (
     <div>
@@ -24,7 +26,7 @@ export default function ProfileCard({ p }: { p: Card }) {
     <Link
       to={`/profile/${p.id}`}
       className={`group flex overflow-hidden rounded-2xl bg-ink/5 ring-1 transition sm:aspect-square ${
-        isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:ring-ink/20'
+        isGold ? 'gold-glow ring-amber-400/70' : 'ring-ink/10 hover:bg-ink/10 hover:shadow-lg hover:shadow-rose-500/15 hover:ring-rose-300/40'
       }`}
     >
       {/* Left: photo — balanced on mobile, the larger column (~60%) on larger screens */}
@@ -57,11 +59,16 @@ export default function ProfileCard({ p }: { p: Card }) {
           <span className="truncate">{p.name}</span>
         </div>
         <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
-          <Row label="Sign" value={p.sign ? `${zodiacSymbol(p.sign) ?? ''} ${p.sign}`.trim() : null} />
+          <Row label="Sign" value={p.sign ? <><span className={zodiacColor(p.sign)}>{zodiacSymbol(p.sign)}</span> {p.sign}</> : null} />
           <Row label="Body" value={p.body_type} />
           <Row label="Height" value={formatHeight(p.height_cm, config.units)} />
           <Row label="Weight" value={formatWeight(p.weight_kg, config.units)} />
         </div>
+        {p.tags?.length > 0 && (
+          <div className="flex shrink-0 flex-wrap gap-1">
+            {p.tags.slice(0, 2).map((t) => <TagChip key={t} tag={t} size="sm" />)}
+          </div>
+        )}
         <div className="shrink-0 pt-1">
           <StarRating value={p.rating} size={15} showNumber={p.rating > 0} />
         </div>
