@@ -4,6 +4,7 @@ import { api } from '../lib/api';
 import { useCanEdit } from '../auth/AuthContext';
 import { useSettings } from '../settings/SettingsContext';
 import { cmToFt, ftInToCm, kgToLb, lbToKg } from '../lib/format';
+import TagChip from '../components/TagChip';
 
 interface FormState {
   name: string;
@@ -14,11 +15,12 @@ interface FormState {
   weight: string; // in the active display unit (lb or kg)
   body_type: string;
   status: string;
+  tags: string[];
   notes: string;
   extra: { key: string; value: string }[];
 }
 
-const empty: FormState = { name: '', birthday: '', ft: '', inch: '', cm: '', weight: '', body_type: '', status: 'active', notes: '', extra: [] };
+const empty: FormState = { name: '', birthday: '', ft: '', inch: '', cm: '', weight: '', body_type: '', status: 'active', tags: [], notes: '', extra: [] };
 
 export default function ProfileEdit() {
   const { id } = useParams();
@@ -28,8 +30,15 @@ export default function ProfileEdit() {
   const { config } = useSettings();
   const us = config.units === 'us';
   const [form, setForm] = useState<FormState>(empty);
+  const [tagInput, setTagInput] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  function addTag(t: string) {
+    const v = t.trim();
+    if (!v || form.tags.some((x) => x.toLowerCase() === v.toLowerCase())) return;
+    setForm((f) => ({ ...f, tags: [...f.tags, v] }));
+  }
 
   useEffect(() => {
     if (!editing) return;
@@ -47,6 +56,7 @@ export default function ProfileEdit() {
         weight,
         body_type: profile.body_type || '',
         status: profile.status || 'active',
+        tags: profile.tags || [],
         notes: profile.notes || '',
         extra: Object.entries(profile.extra || {}).map(([key, value]) => ({ key, value: String(value) })),
       });
@@ -81,6 +91,7 @@ export default function ProfileEdit() {
       weight_kg,
       body_type: form.body_type || null,
       status: form.status || 'active',
+      tags: form.tags,
       notes: form.notes || null,
       extra,
     };
@@ -151,6 +162,22 @@ export default function ProfileEdit() {
             <select className={input} value={form.status} onChange={(e) => set('status', e.target.value)}>
               {config.statuses.map((s) => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
             </select>
+          </div>
+        </div>
+
+        <div>
+          <label className={label}>Vibe tags</label>
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {form.tags.length ? form.tags.map((t) => <TagChip key={t} tag={t} onRemove={() => set('tags', form.tags.filter((x) => x !== t))} />)
+              : <span className="text-sm text-ink/30">None yet.</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => addTag('💚 Green flag')} className="rounded-lg bg-emerald-500/15 px-3 py-1.5 text-sm text-emerald-400 ring-1 ring-emerald-400/30 hover:bg-emerald-500/25">💚 Green flag</button>
+            <button type="button" onClick={() => addTag('🚩 Red flag')} className="rounded-lg bg-rose-500/15 px-3 py-1.5 text-sm text-rose-400 ring-1 ring-rose-400/30 hover:bg-rose-500/25">🚩 Red flag</button>
+            <input value={tagInput} onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagInput); setTagInput(''); } }}
+              placeholder="Custom tag…" className={input + ' min-w-32 flex-1'} />
+            <button type="button" onClick={() => { addTag(tagInput); setTagInput(''); }} className="rounded-lg bg-ink/10 px-3 py-1.5 text-sm hover:bg-ink/20">Add</button>
           </div>
         </div>
 

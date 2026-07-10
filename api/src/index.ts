@@ -87,7 +87,10 @@ const jarvisAuth = async (c: any, next: any) => {
 function serializeProfile(row: any) {
   let extra: any = {};
   if (row.extra) { try { extra = JSON.parse(row.extra); } catch { extra = {}; } }
+  let tags: string[] = [];
+  if (row.tags) { try { tags = JSON.parse(row.tags); } catch { tags = []; } }
   return {
+    tags,
     id: row.id,
     name: row.name,
     birthday: row.birthday,
@@ -114,6 +117,7 @@ const DEFAULT_CONFIG = {
   rating_half_steps: true,
   gold_standard_id: null as string | null,
   statuses: ['active', 'inactive'],
+  rating_icon: 'heart' as 'heart' | 'star',
 };
 
 async function getConfig(c: any) {
@@ -190,6 +194,7 @@ app.put('/admin/settings', auth, requireAdmin, async (c) => {
     const s = cleanList(b.statuses);
     if (s.length) next.statuses = s;
   }
+  if (b.rating_icon === 'heart' || b.rating_icon === 'star') next.rating_icon = b.rating_icon;
   await c.env.DB.prepare(
     "INSERT INTO settings (key, value) VALUES ('config', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).bind(JSON.stringify(next)).run();
@@ -221,13 +226,14 @@ app.post('/profiles', auth, requireEditor, async (c) => {
   const ts = now();
   const birthday = b.birthday || null;
   await c.env.DB.prepare(
-    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, status, notes, extra, created_by, created_at, updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+    `INSERT INTO profiles (id, name, birthday, sign, height_cm, weight_kg, body_type, rating, status, notes, extra, tags, created_by, created_at, updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
   ).bind(
     id, String(b.name).trim(), birthday, zodiac(birthday),
     b.height_cm ?? null, b.weight_kg ?? null, b.body_type ?? null, clampRating(b.rating ?? 0),
     b.status ? String(b.status) : 'active',
     b.notes ?? null, b.extra ? JSON.stringify(b.extra) : null,
+    Array.isArray(b.tags) && b.tags.length ? JSON.stringify(b.tags) : null,
     c.get('user').id, ts, ts,
   ).run();
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
@@ -268,11 +274,12 @@ app.patch('/profiles/:id', auth, requireEditor, async (c) => {
   const rank = b.rank !== undefined ? (b.rank === null ? null : Number(b.rank)) : existing.rank;
   const notes = b.notes !== undefined ? b.notes : existing.notes;
   const extra = b.extra !== undefined ? (b.extra ? JSON.stringify(b.extra) : null) : existing.extra;
+  const tags = b.tags !== undefined ? (Array.isArray(b.tags) && b.tags.length ? JSON.stringify(b.tags) : null) : existing.tags;
 
   await c.env.DB.prepare(
-    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, status=?, rank=?, notes=?, extra=?, updated_at=?
+    `UPDATE profiles SET name=?, birthday=?, sign=?, height_cm=?, weight_kg=?, body_type=?, rating=?, status=?, rank=?, notes=?, extra=?, tags=?, updated_at=?
      WHERE id=?`,
-  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, status, rank, notes, extra, now(), id).run();
+  ).bind(name, birthday, sign, height_cm, weight_kg, body_type, rating, status, rank, notes, extra, tags, now(), id).run();
   const row = await c.env.DB.prepare('SELECT * FROM profiles WHERE id = ?').bind(id).first();
   return c.json({ profile: serializeProfile(row) });
 });

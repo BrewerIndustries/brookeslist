@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ThemeProvider } from './theme/ThemeContext';
 import App from './App';
+import DevBadge from './components/DevBadge';
 import './index.css';
 
 // Router basename matches Vite's base ('/' prod, '/dev' dev) so deep links under
@@ -16,6 +17,7 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <AuthProvider>
           <App />
+          <DevBadge />
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

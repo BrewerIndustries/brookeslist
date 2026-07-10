@@ -108,7 +108,20 @@ export default function Settings() {
         </Section>
 
         {/* Ratings */}
-        <Section title="Ratings" subtitle="How the 0–5 star rating behaves.">
+        <Section title="Ratings" subtitle="How the 0–5 rating behaves.">
+          <div className="mb-3 flex gap-2">
+            {(['heart', 'star'] as const).map((ic) => (
+              <button
+                key={ic}
+                onClick={() => set('rating_icon', ic)}
+                className={`rounded-lg px-4 py-2 text-sm ring-1 ${
+                  draft.rating_icon === ic ? 'bg-rose-500 text-white ring-rose-400' : 'bg-ink/5 text-ink/70 ring-ink/10 hover:bg-ink/10'
+                }`}
+              >
+                {ic === 'heart' ? '♥ Hearts' : '★ Stars'}
+              </button>
+            ))}
+          </div>
           <label className="flex items-center gap-2 text-sm text-ink/80">
             <input
               type="checkbox"

@@ -16,7 +16,7 @@ export default function App() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center text-ink/50">
-        <div className="animate-pulse text-lg tracking-wide">Brooke's List…</div>
+        <div className="animate-pulse text-lg tracking-wide">Brooke's List <span className="text-rose-300">♡</span></div>
       </div>
     );
   }
